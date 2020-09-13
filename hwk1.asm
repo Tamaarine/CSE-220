@@ -404,11 +404,86 @@ option_s:
 	# And the goal is to turn it into two's complement and storing it into register $s1
 	li $s1, 0 # Resetting the register to 0
 	
+	# Load the second argument's starting address into register $t1
+	lw $t1, addr_arg1
 	
-	li $v0, 1
-	li $a0, 407
-	syscall
-	j exit
+	li $t4, 48 # $t4 store 48 which is ascii for 1
+	li $t5, 57 # $t5 stores 57 which is ascii for 9
+	li $t6, 65 # $t6 stores 65 which is ascii for A
+	li $t7, 70 # $t7 stores 70 which is ascii for F
+	
+	hexadecimal_loop_option_three: # This turns 4 char into hexadecimal of what it is suppose to represent
+		# We will loop through the 4 characters one by one into register $t2
+		lbu $t2, 0($t1)
+		
+		# Before we move on check if character is a terminating char, if it is equal to 0 then exit
+		beq $t2, $0, finish_option_three_algorithm
+		
+		bgt $t4, $t2, invalid_args # If 48 is greater than the current ascii then it is definietly not 1-9, A-F
+		bgt $t2, $t7, invalid_args # If the current ascii is greater than the 70 then it is not 1-9, A-F
+		# Now we are bound between 48-70 inclusive
+		ble $t2, $t5, is_number_three # It is a number if it is less than or equal 57
+		bge $t2, $t6, is_letter_three # It is a letter if it is greater than or equal 65
+		
+		j invalid_args # The value is between 58-64 inclusive hence invalid
+		
+		is_letter_three:
+		# If the ascii is letter we subtract 55
+		addi $t2, $t2, -55
+		j done_ascii_to_value_three
+		
+		is_number_three:
+		# If the ascii is a number we subtract 48
+		addi $t2, $t2, -48
+	
+		done_ascii_to_value_three:
+		# If we are here that means we finish transforming the ascii char from ascii to decimal
+		# We store that into $s1 and shift 4 bits to the left
+		# Shift before add!
+		sll $s1, $s1, 4 # Shift 4 bits to the left
+		add $s1, $s1, $t2 # Adding it to the register
+		# Increment address of the word to get the next character
+		addi $t1, $t1, 1
+	
+		# Then we jump back up the loop
+		j hexadecimal_loop_option_three
+	
+	finish_option_three_algorithm:
+		# Now we have to get the sign bit inside $s1 to determine whether or not more work
+		# is required
+		# We will use $t0 to store our mask bit
+		li $t0, 1 # Put 1 into the register
+		
+		# Then we shift left 15 bits to make it into the 16th position
+		sll $t0, $t0, 15
+		
+		# We put the sign bit into $t1
+		and $t1, $t0, $s1
+		
+		# Now here comes determining whether we have more work or not
+		# If it is equal to 0 that means the number is positive no more is require just print it
+		beq $t1, $0, skip_more_work_option
+		
+		# If we are here that means the sign bit is 1, meaning the number is negative hence
+		# more work is required
+		# First $t2 will store the mask bit to only keep the 15 digit from the right
+		li $t2, 0x7FFF
+		
+		# Then we AND it with $s1 to take out the sign bit
+		and $s1, $s1, $t2
+		
+		# Then we NOT $s1 to get one's complement
+		not $s1, $s1
+		
+		# Then we add 1
+		addi $s1, $s1, 1
+		
+		# Then the conversion is complete just print it
+		
+		skip_more_work_option:
+			# If we are here we just have to print whatever is in $s1
+			j print_s1_as_binary
+	
 option_f:
 	# The input of capital F is reached here
 	# Load in $t5 as the argument comparer
@@ -418,10 +493,28 @@ option_f:
 	# We branch away if the total argument is not 2, and remain here if it is
 	bne $a0, $t5, invalid_args
 	
-	li $v0, 1
-	li $a0, 10001
-	syscall
-	j exit
+	# If we are here that means we have to convert the given argument from decimal into binary which includes a fraction
+	# We have to split up the work where we do whole number first
+	# Then we work on fractions next
+	# Alright let's start with the whole number, to convert the given integer into binary we have to turn
+	# it from ascii into hexadecimal value first
+	
+	# Again $s1 will store the hexadecimal value of the integer part
+	# Then $s2 will store the hexadecimal value of the decimal part
+	li $s1, 0 # Initialize the register to 0
+	li $s2, 0 # Initialize the register to 0
+	
+	# $t1 will be storing the address of where the character begins
+	lw $t1, addr_arg1
+	
+	# Because we know the String is fixed 3 digit we can just grab those using 0,1,2 immediate
+	grab_whole_number_loop:
+		
+	
+	
+	
+	
+	
 option_r:
 	# The input of capital R is reached here
 	# Load in $t5 as the argument comparer 
