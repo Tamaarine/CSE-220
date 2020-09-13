@@ -504,15 +504,201 @@ option_f:
 	li $s1, 0 # Initialize the register to 0
 	li $s2, 0 # Initialize the register to 0
 	
-	# $t1 will be storing the address of where the character begins
-	lw $t1, addr_arg1
+	# $t0 will be storing the address of where the character begins
+	lw $t0, addr_arg1
 	
 	# Because we know the String is fixed 3 digit we can just grab those using 0,1,2 immediate
-	grab_whole_number_loop:
+	# Here we have all the registers free except $t0, $s1, and $s2
+	lbu $t1, 0($t0) # Grab the first digit of the whole number
+	lbu $t2, 1($t0) # The second digit of the whole number
+	lbu $t3, 2($t0) # The third digit of thew hole number
+	
+	# Nowe we have to subtract the ascii values to get the actual decimal values
+	addi $t1, $t1, -48 # Get the decimal of the first digit
+	addi $t2, $t2, -48 # Get the decimal of the second digit
+	addi $t3, $t3, -48 # Get the decimal of the third digit
+	
+	# Store immediate 100 and 10 in $t6 and $t7 for use
+	li $t6, 100
+	li $t7, 10
+	
+	# Multiply $t1 by 100 and store it in $t1
+	mul $t1, $t1, $t6
+	
+	# Multiply $t2 by 10 and store it in $t2
+	mul $t2, $t2, $t7
+	
+	# Add $t1 and $t2 first and store it into $t1
+	add $t1, $t1, $t2
+	
+	# Then we add $t1 with $t3 and store it in $t1
+	add $t1, $t1, $t3
+	
+	# Now if we are here $t1 contains our decimal(hexadecimal in register) whole number and we must print the binary
+	# value.
+	# We have to figure out the number of bits we have to print for the integer part, which can be done
+	# By counting the number of division that is require to make $t1 into 0 by dividing by 2
+	# We don't want to lose our number so we use another register to do the division
+	move $t2, $t1 # Copy $t1 into $t2
+	
+	li $t3, 0 # $t3 will be our counter for the number of division that is required
+	li $t4, 2 # This register will store 2 which is the divisor
+	
+	division_counting_loop: # This loop will counting the number of times that is required to make $t2 into 0	
+		# If $t3 is equal to 0 then we have done counting the number of division that is required
+		beq $t2, $0, finished_counting
 		
+		# If we are here we first do the division
+		div $t2, $t4
+		
+		# lo contains our quotient we don't care about reminder store it into $t2
+		mflo $t2
+		
+		# Then increment our counter and j back to the loop at the top
+		addi $t3, $t3, 1
+		
+		j division_counting_loop
+		
+	finished_counting:
+	# If we are here then we finished counting the number of division in $t3
+	# $t3 represent the number of bits we need for printing
+	# $t1 represent the actual number we have to print, whole integer part
+	
+	# We have the special case when $t3 is 0 meaning the whole number part is equal to 0 hence we skip to just printing a 0
+	beq $t3, $0, only_one_zero
+	
+	li $t4, 1 # $t4 will be used as a masking register for printing
+	
+	# The number of left shift we have to do is $t3 minus one
+	addi $t3, $t3, -1
+	
+	# Then we do the shift using $t3's value
+	sllv $t4, $t4, $t3
+	
+	# Now we will be using a loop to print the whole integer number as a binary number
+	loop_for_f_binary: # This loop aim to print $t1 using $t4 as masking bit
+		# If the masking bit is equal to 0 then we are done printing just exit
+		beq $t4, $0, finished_binary_loop_f
+		
+		# We AND $t4(mask) with $t1 and store into $t2
+		and $t2, $t1, $t4
+		
+		bne $t2, $0, print_one_bit
+		beq $t2, $0, print_zero_bit
+		
+		continue_after_printing_binary:
+		# After pritning we have to shift right the mask register
+		srl $t4, $t4, 1
+		
+		# And jump back up the loop
+		j loop_for_f_binary
+		
+	print_one_bit:
+		# Prints 1 and jumps back to the loop
+		li $v0, 1
+		li $a0, 1
+		syscall
+		
+		j continue_after_printing_binary
+	
+	print_zero_bit:
+		# Prints 0 and jumps back to the loop
+		li $v0, 1
+		li $a0, 0
+		syscall
+		
+		j continue_after_printing_binary
+		
+	only_one_zero:
+		li $v0, 1
+		li $a0, 0
+		syscall
+		
+		# Don't have to jump after printing because it is next line anyway
+	
+	finished_binary_loop_f:
+	# Now we have printed the whole number part let's move on to the fraction part
+	# Before that let's print the period
+	# Let's load the character back into $t0 register again
+	lw $t0, addr_arg1
+	
+	# We have gather the characters from imemdaiate 3, 4, 5, 6, 7, 8 because is a period follow by 5 fractions
+	# We will be storing them from $t1 to $6 respectively
+	lbu $t1, 3($t0)
+	lbu $t2, 4($t0)
+	lbu $t3, 5($t0)
+	lbu $t4, 6($t0)
+	lbu $t5, 7($t0)
+	lbu $t6, 8($t0)
+	
+	# Then again we have to subtract 48 to get the real decimal value, don't need to for $t1
+	addi $t2, $t2, -48
+	addi $t3, $t3, -48
+	addi $t4, $t4, -48
+	addi $t5, $t5, -48
+	addi $t6, $t6, -48
+	
+	# Now we will find out which bit is turned on in the fraction part
+	# Now because the fraction is always in 5 bits and is made up of 2^-1 to 2^-5
+	# We can just use subtraction to figure out which bit is needed to print in a loop
+	
+	# First we print period in $t1
+	li $v0, 11
+	move $a0, $t1
+	syscall
+	
+	# The next let's sum the digits up first
+	li $t1, 10000 # We multiply 10,000 to $t2
+	
+	# The answer will be store in $t2 and $t1 is used as our storage for 10^n
+	mul $t2, $t1, $t2  
+	
+	li $t1, 1000 # We multiply 1,000 to $t3 and add it to $t2
+	
+	# So $t3 times 1,000
+	mul $t3, $t1, $t3
+	
+	# Add it back into $t2
+	add $t2, $t2, $t3
+	
+	li $t1, 100 # We multiply 100 to $t4 and add it to $t2
+	
+	# So $t4 times 100
+	mul $t4, $t1, $t4
+	
+	# Add it back into $t2
+	add $t2, $t2, $t4
+	
+	li $t1, 10 # We multiply 10 to $t5 and add it to $t2
+	
+	# So $t4 times 10
+	mul $t5, $t1, $t5
+	
+	# Add it back into $t2
+	add $t2, $t2, $t5
+	
+	# Lastly we just add $t6 into $t2
+	add $t2, $t2, $t6
+	
+	# $t2 will contain the fraction part read as a whole number
+	# Next we will store 2^-1 to 2^-5 as whole number by multiplying by 100,000
+	# They will be in $t3 - $t7 respectively
+	li $t3, 50000
+	li $t4, 25000
+	li $t5, 12500
+	li $t6, 6250
+	li $t7, 3125
 	
 	
 	
+	
+	
+	
+	
+	
+	
+	
+	j exit
 	
 	
 option_r:
