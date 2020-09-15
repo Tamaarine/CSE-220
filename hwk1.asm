@@ -689,17 +689,127 @@ option_f:
 	li $t6, 6250
 	li $t7, 3125
 	
+	# If our fraction whole number part is greater than 50,000 we branch to minus_t3
+	# To print 1 and jump to continue_back_one
+	bge $t2, $t3, minus_t3
+	
+	# If it is not greater than 50,000 then we know we don't use it and hence we print a 0 instead of a 1
+	# Then we continue to check if it is greater than orequal to 25,000
+	li $v0, 1
+	li $a0, 0
+	syscall
+	
+	# We jump back here after minus_t3
+	continue_back_one:
+	
+	# If this is true that means our whole number part is greater than 25,000 hence we branch to minus_t4
+	# To print 1 and jump to continue_back_two
+	bge $t2, $t4, minus_t4
+	
+	# If we are here that means our fraction is not greater than 25,000 hence we print a 0
+	li $v0, 1
+	li $a0, 0
+	syscall
+	
+	# We jump back here after minus_t4
+	continue_back_two:
+	
+	# If this is true our whole number is greater than 12,500 hence we branch to minus_t5
+	# To print 1 and jump to continue_back_three
+	bge $t2, $t5, minus_t5
+	
+	# If we are here that means our fraction is not greater than 12,500 hence we print a 0
+	li $v0, 1
+	li $a0, 0
+	syscall
+	
+	# We jump back here after minus_t5
+	continue_back_three:
+	
+	# Then we check if whole number isgreater than 6,250 hence we branch to minus_t6
+	bge $t2, $t6, minus_t6
+	
+	# If we are here that means our fraction is not greater than 6,250 hence we print a 0
+	li $v0, 1
+	li $a0, 0
+	syscall
+	
+	# We jump back here after minus_t6
+	continue_back_four:
+	
+	# LASTLY we check if we are greater than 3125 if it is we branch to minus_t7
+	bge $t2, $t7, minus_t7
+	
+	# If we are here that means our fraction is not greater than 3,125 hence we print our last 0
+	li $v0, 1
+	li $a0, 0
+	syscall
+	
+	# We jump back here after minus_t7
+	continue_back_five:
 	
 	
-	
-	
-	
-	
-	
-	
+	# FINALLY, all the printing is done we just have to print the \n character and exit
+	li $v0, 11
+	li $a0, '\n'
+	syscall
 	
 	j exit
 	
+	
+	minus_t3:
+		# We subtract 50,000 from our fraction value, have to use sub because of 16-bit overflow
+		sub $t2, $t2, $t3
+		
+		# And print 1 as our binary value
+		li $v0, 1
+		li $a0, 1
+		syscall
+		
+		j continue_back_one
+		
+	minus_t4:
+		# We subtract 25,000 from our fraction value
+		addi $t2, $t2, -25000
+		
+		# And print 1 as our binary value
+		li $v0, 1
+		li $a0, 1
+		syscall
+		
+		j continue_back_two
+	
+	minus_t5:
+		# We subtract 12,500 from our fraction valule
+		addi $t2, $t2, -12500
+		
+		# Then print 1 as our binary value
+		li $v0, 1
+		li $a0, 1
+		syscall
+		
+		j continue_back_three
+	
+	minus_t6:
+		# We subtract 6,250 from our fractionvalue
+		addi $t2, $t2, -6250
+		
+		# Then print 1
+		li $v0, 1
+		li $a0, 1
+		syscall
+		
+		j continue_back_four
+	
+	minus_t7:
+		# Technically we don't even have to subtract if we are here that means
+		# It is the last 1 we have to print because the fractional part always fit inside 5 bits
+		# So just print 1 and jump back
+		li $v0, 1
+		li $a0, 1
+		syscall
+		
+		j continue_back_five	
 	
 option_r:
 	# The input of capital R is reached here
@@ -710,9 +820,165 @@ option_r:
 	# Again be branch away if the total argument is not 7, and remain here if it is
 	bne $a0, $t5, invalid_args
 	
-	li $v0, 1
-	li $a0, 777
+	# If we are here that means we have 6 more arugment
+	# The first one is always 00 representing an empty register
+	# The second and to the fifth one will always be 2 digits and must be between 0-31 inclusive in decimal
+	# The sixth argument will be also 2 digits and be between 0-63 inclsuive in decimal
+	
+	# The first thing to do is to convert the second to sixth argument into decimal values and store them into register
+	# Let's let $t0 to $t6
+	# $t0 will be the opcode argument which is always 00 so we just haveto store 0 into $t0
+	li $t0, 0
+	
+	# We load 10 into $s1 for multiplication
+	li $s1, 10
+	
+	# We load 32 into $s2 for comparsion
+	li $s2, 32
+	
+	# We load 64 into $s3 for comparsion
+	li $s3, 64
+	
+	# $t1 will be rs argument but first we have to read it from ascii into decimal
+	# The rs argument is stored in the third argument (addr_arg2)
+	# Let's put the address into $t1 first then we can obtain the characters
+	# Let's store the two characters into $t2 and $t3 respectively and combine to store it into $t1 using
+	# multiplication
+	lw $t1, addr_arg2 # Getting the first digit character
+	
+	# Store the first and secondd digit in $t2, $t3 respectivel
+	lbu $t2, 0($t1)
+	lbu $t3, 1($t1)
+	
+	# Then we minius 48 to get the actual decimal value
+	addi $t2, $t2, -48
+	addi $t3, $t3, -48
+	
+	# Multiply $t2 by $t1 and add $t3 to it then store result into $t1
+	mul $t1, $t2, $s1
+	add $t1, $t1, $t3 # Then add $t3 into $t1 to get our decimal value of rs argument
+	
+	# Then we compare $t1 against $22 to make sure it is between 0-31
+	bge $t1, $s2, invalid_args
+	
+	# If we are here that means $t1 is in valid range
+	# rs conversion if complete we move onto the next one
+	# rt is next which is in (addr_arg3)
+	lw $t2, addr_arg3
+	
+	# Then we store the first and second digit in $t3 and $t4 respectively
+	lbu $t3, 0($t2)
+	lbu $t4, 1($t2)
+	
+	# Minius 48 to get the actual decimal value
+	addi $t3, $t3, -48
+	addi $t4, $t4, -48
+	
+	# Multiply $t3 by $s1 and add $t4 to it then store result into $t2
+	mul $t2, $t3, $s1
+	add $t2, $t2, $t4 # Then we add $t4 into $t2 to get our decimal value for rt
+	
+	# Then we check $t2 against $s2 to make sure rt is between 0-31
+	bge $t2, $s2, invalid_args
+	
+	# If we are here then time to convert rd which is in (addr_arg4)
+	lw $t3, addr_arg4
+	
+	# Store first and second digit first into $t4 and $t5
+	lbu $t4, 0($t3)
+	lbu $t5, 1($t3)
+	
+	# Minius 48 to get the actual decimal value
+	addi $t4, $t4, -48
+	addi $t5, $t5, -48
+	
+	# Multiply $t4 by $s1 and add $t5 then store into $t3
+	mul $t3, $t4, $s1
+	add $t3, $t3, $t5
+	
+	# Then we check $t3 against $s2 to make sure rd is between 0-31
+	bge $t3, $s2, invalid_args
+	
+	# If we are here then rd is valid hence we are going to convert shamt in (addr_arg5)
+	lw $t4, addr_arg5
+	
+	# Store first and second digit first into $t5 and $t6
+	lbu $t5, 0($t4)
+	lbu $t6, 1($t4)
+	
+	# Minius 48 to get the actual decimal value
+	addi $t5, $t5, -48
+	addi $t6, $t6, -48
+	
+	# Multiply $t5 by $s1 and add $t6 then store into $t4
+	mul $t4, $t5, $s1
+	add $t4, $t4, $t6
+	
+	# Then we check $t4 against $s2 to make sure shamt is between 0-31
+	bge $t4, $s2, invalid_args
+	
+	# FINALLY the last argument to check is funct is in (addr_arg6)
+	lw $t5, addr_arg6
+	
+	# Store first and second digit first into $t6 and $t7
+	lbu $t6, 0($t5)
+	lbu $t7, 1($t5)
+	
+	# Minius 48 to get the actual decimal valule
+	addi $t6, $t6, -48
+	addi $t7, $t7, -48
+	
+	# Multiply $t6 by $s1 and add $t7 then store it into $t5
+	mul $t5, $t6, $s1
+	add $t5, $t5, $t7
+	
+	# Then we check $t5 against $s3 to make sure funct is between 0-63
+	bge $t5, $s3, invalid_args
+	
+	# Finally if we are here $t1 to $t5 represent rs, rt, rd, shamt, and funct let's check and $t0 to represent 00
+	# We will be putting the result of putting together all opcode, rs, rt, rd, shamt, and funct bit into
+	# register $s1. First let's add funct into register $s1
+	# Reset $s1 register to 0 first
+	li $s1, 0
+	
+	# Then add $t5 which is funct into $s1 first
+	add $s1, $s1, $t5
+	
+	# Then $t4 register that stores shamt will be shifted left 6 bits and OR into $s1
+	sll $t4, $t4, 6 # Shift to the left 6 bits
+	
+	# Then or with $s1 to concatenate the bit
+	or $s1, $s1, $t4
+	
+	# Next in $t3 we have our rd value let's shift left for 11 bits and OR into $s1
+	sll $t3, $t3, 11
+	
+	# OR it to the $s1
+	or $s1, $s1, $t3
+	
+	# Next in $t2 we have our rt value let's shift to the left for 16 bits and OR into $s1
+	sll $t2, $t2, 16
+	
+	# OR it to the $s1
+	or $s1, $s1, $t2
+	
+	# Last in $t1 we have our rs value let's shift to the left for 21 bits and OR into $s1
+	sll $t1, $t1, 21
+	
+	# THEN OR it to the $s1
+	or $s1, $s1, $t1
+	
+	# Then what we should have in our $s1 is the R instruction we need to print it in hexadecimal
+	# Using value 34 for syscall to print it
+	li $v0, 34
+	move $a0, $s1
 	syscall
+	
+	# Then don't forget to print the new line character
+	li $v0, 11
+	li $a0, '\n'
+	syscall
+	
 	j exit
 	
 option_p:
