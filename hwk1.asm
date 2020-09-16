@@ -1209,11 +1209,95 @@ option_p:
 	# Let's reload the addr into $t0 again and make sure we have the right thing
 	lw $t0, addr_arg1
 	
+	# Let's get the suit and ranks
+	li $t6, 0xF0 # Mask for getting the suit
+	li $t7, 0xF # Mask for getting the rank
+	
+	# Let's load the byte first
+	lbu $t1, 0($t0)
+	lbu $t2, 1($t0)
+	lbu $t3, 2($t0)
+	lbu $t4, 3($t0)
+	lbu $t5, 4($t0)
+
+	# Suit will be in $s1 - $s5 using $t6
+	and $s1, $t1, $t6
+	and $s2, $t2, $t6
+	and $s3, $t3, $t6
+	and $s4, $t4, $t6
+	and $s5, $t5, $t6
+	
+	# Rank will be in $t1 - $t5 using $t7
+	and $t1, $t1, $t7
+	and $t2, $t2, $t7
+	and $t3, $t3, $t7
+	and $t4, $t4, $t7
+	and $t5, $t5, $t7
+	
+	# 64(decimal) 40(hexadecimal) = Clubs
+	# 80(decimal) 50(hexadecimal) = Spades
+	# 96(decimal) 60(hexadecimal) = Diamonds
+	# 112(decimal) 70(hexadecimal) = Hearts
+	
 	# We will have different sections for checking poker hands
 	# We will check for Bib bobtail first because it rank the highest
 	# Then we will have different labels for all the other ranks just in case
 	# If we skip any
-	check_big_booby:
+	check_big_boobtail:
+		# First if we are here then we have to check the suit of the 3 register $s2 - $s4
+		# If they are all equal then we will proceed
+		bne $s2, $s3, check_full_house # If second card and third card not same suit not big_boobtail
+		bne $s2, $s4, check_full_house # Second card and fourth not same suit not big_boobtail
+		bne $s3, $s4, check_full_house # Third and fourth not same not big_boobtail
+	
+		# We will put subtraction results in $t6
+		# We will put 1 in $t7 to check if the difference between each register is 1
+		li $t7, 1
+	
+		# If we are here then that means we have 3 same suit card in the middle, now
+		# The fourth one could be the first or last
+		beq $s1, $s2, proceed_check_ranks_one # Subcase one if the first 4 card have same suit
+		beq $s2, $s5, proceed_check_ranks_two # Subcase two if the last 4 card have same suit
+		
+		# If we are here then only 3 same suit can't be big_boobtail
+		# Check full house next
+		j check_full_house
+		
+		proceed_check_ranks_one: # The straight flush is card 1 to card 4, $t1 - $t4
+		sub $t6, $t2, $t1 # Card 2 - card 1
+		bne $t6, $t7, check_full_house # Not consecutive between card 1 and card 2, check_full_house
+		
+		sub $t6, $t3, $t2 # Card 3 - card 2
+		bne $t6, $t7, check_full_house # Not consecutive between card 2 and card 3, check_full_house
+		
+		sub $t6, $t4, $t3 # Card 4 - card 3
+		bne $t6, $t7, check_full_house # Not consecutive between card 4 and card 3, check_full_house
+		
+		# If we are here then that means it is definitely a bib_boobtail hence we print
+		li $v0, 4
+		la $a0, big_bobtail_str
+		syscall
+		
+		# Exit because we are done
+		j exit
+		
+		proceed_check_ranks_two: # The straight flush is card 2 to card 5, $t2 - $t5
+		sub $t6, $t3, $t2 # Card 3 - card 2
+		bne $t6, $t7, check_full_house # Not consecutive between card 2 and card 3, check_full_house
+		
+		sub $t6, $t4, $t3 # Card 4 - card 3
+		bne $t6, $t7, check_full_house # Not consecutive between card 3 and card 4, check_full_house
+		
+		sub $t6, $t5, $t4 # Card 5 - card 4
+		bne $t6, $t7, check_full_house # Not consecutive between card 4 and card 5, check_full_house
+		
+		# If we are here then that means it is definitely a bib_boobtail hence we print
+		li $v0, 4
+		la $a0, big_bobtail_str
+		syscall
+		
+		# Exit because we are done
+		j exit
 	
 	check_full_house:
 	
@@ -1225,7 +1309,9 @@ option_p:
 	
 	just_high_noon:
 	
-	
+	li $a0, 69
+	li $v0, 1
+	syscall
 	j exit
 	
 valid_arg:
