@@ -990,11 +990,243 @@ option_p:
 	# Branch away if its not 2
 	bne $a0, $t5, invalid_args
 	
-	li $v0, 1
-	li $a0, 69
-	syscall
-	j exit
+	# If we are here that means we have one additional argument which presents the card hands that we have to
+	# Parse and sort to figure out which Poker hand it is
+	# Load the address of the input first into $t0
+	lw $t0, addr_arg1
 	
+	# Now we have all 5 ascii characters in $t1 - $t5
+	# Keep in mind the ascii value will be only in 2 hexadecimal digits, or 8 bits
+	# The left 4 bit represent the suit and right 4 bit represent the rank of the card
+	# Let's parse each ascii and store their rank in $t1 - $t5 register
+	li $t7, 0xF
+	
+	# Now we have the value of the card let's go through each painful iteration and sort the register
+	# As well of as the word together
+	# $s7 will store the smallest's rank's address using la $s7, (that card in $t registers)
+	# $s6 will hold the smallest card's value using $s6
+	iteration_one:
+		# Getting the card from memory
+		lbu $t1, 0($t0) # First card
+		lbu $t2, 1($t0) # Second card
+		lbu $t3, 2($t0) # Third card
+		lbu $t4, 3($t0) # Fourth card
+		lbu $t5, 4($t0) # Fifth card
+		
+		# Getting the rank that is inside each ascii that reprsents the card
+		and $s1, $t1, $t7 # ANDing $t1 and $t7 to get rank
+		and $s2, $t2, $t7 # ANDing $t2 and $t7 to get rank
+		and $s3, $t3, $t7 # ANDing $t3 and $t7 to get rank
+		and $s4, $t4, $t7 # ANDing $t4 and $t7 to get rank
+		and $s5, $t5, $t7 # ANDing $t5 and $t7 to get rank
+		
+		# We will assume that the address of the smallest rank is the first card
+		# Until proven
+		move $s7, $t0 # Getting the address in the main memory of the first card
+		
+		move $s6, $s1 # We assume card #1 is the smallest until proven
+		
+		loop_until_found_min_s1: # This will run until we have found the smallest first card
+		# Here we will be doing the comparsion
+		bgt $s6, $s2, min_2_iter1 # Our assumption is greater than another value, $s2 update address to second card
+		bgt $s6, $s3, min_3_iter1 # Our assumption is greater than another value, $s3 update address to third card
+		bgt $s6, $s4, min_4_iter1 # Our assumption is greater than another value, $s4 update address to fourth card
+		bgt $s6, $s5, min_5_iter1 # Our assumption is greater than another value, $s5 update address to fifth card
+		
+		# If we reach here then $s6 finished finding the smallest and hence we do the swapping
+		# Because we updated the $s7 with the address of that minimum card, and know
+		# It has to swap with the first card we can do so
+		# We only have to switch it in the main memory since we will load back up each card in
+		# later iteration so there is no need to update the register
+		lbu $s1, 0($s7) # We load the smallest card into a temp in $s1
+		sb $t1, 0($s7) # Put the first card in the smallest card's place
+		sb $s1, 0($t0) # Put the smallest card in the first place
+		
+		j iteration_two
+		
+		min_2_iter1: # Update $s7 to the second card and $s6 to the second card's rank
+			move $s7, $t0
+			addi $s7, $s7, 1
+			move $s6, $s2
+			
+			j loop_until_found_min_s1
+		min_3_iter1: # Update $s7 to the third card and $s6 to the third card's rank
+			move $s7, $t0
+			addi $s7, $s7, 2
+			move $s6, $s3
+			
+			j loop_until_found_min_s1
+		min_4_iter1: # Update $s7 to the fourth card and $s6 to the fourth card's rank
+			move $s7, $t0
+			addi $s7, $s7, 3
+			move $s6, $s4
+		
+			j loop_until_found_min_s1
+		min_5_iter1: # Update $s7 to the fifth card and $s6 to the fifth card's rank
+			move $s7, $t0
+			addi $s7, $s7, 4
+			move $s6, $s5
+		
+			j loop_until_found_min_s1
+	
+	iteration_two: # Iteration 2 we assume second card is minimum until proven
+		# Getting the card from memory
+		lbu $t2, 1($t0) # Second card
+		lbu $t3, 2($t0) # Third card
+		lbu $t4, 3($t0) # Fourth card
+		lbu $t5, 4($t0) # Fifth card
+		
+		and $s2, $t2, $t7 # ANDing $t2 and $t7 to get rank
+		and $s3, $t3, $t7 # ANDing $t3 and $t7 to get rank
+		and $s4, $t4, $t7 # ANDing $t4 and $t7 to get rank
+		and $s5, $t5, $t7 # ANDing $t5 and $t7 to get rank
+		
+		# We will assume that the address of the smallest rank is the second card
+		# Until proven
+		move $s7, $t0 # Getting the address in the main memory of the second card
+		addi $s7, $s7, 1 # We add one to get to the memory address of the second card
+		
+		move $s6, $s2 # We assume card #2 is the smallest until proven
+		
+		loop_until_found_min_s2: # This will run until we have found the smallest second card
+		# Here we will be doing the comparsion
+		bgt $s6, $s3, min_3_iter2 # Our assumption is greater than another value, $s3 update address to third card
+		bgt $s6, $s4, min_4_iter2 # Our assumption is greater than another value, $s4 update address to fourth card
+		bgt $s6, $s5, min_5_iter2 # Our assumption is greater than another value, $s5 update address to fifth card
+		
+		# Then if we are here $s7 contains the address of the second smallest card
+		# We just have to swap the characters in the main memory between the second card
+		# With the smallest second card
+		lbu $s1, 0($s7) # We load the smallest card into a temp in $s1
+		sb $t2, 0($s7) # Put the second card in the smallest card's place
+		sb $s1, 1($t0) # Put the smallest card in the second place
+		
+		j iteration_three
+		
+		min_3_iter2: # Update $s7 to third card and $s6 to the third card's rank
+			move $s7, $t0
+			addi $s7, $s7, 2
+			move $s6, $s3
+			
+			j loop_until_found_min_s2
+		min_4_iter2: # Update $s7 to fourth card and $s6 to the fourth card's rank
+			move $s7, $t0
+			addi $s7, $s7, 3
+			move $s6, $s4
+			
+			j loop_until_found_min_s2
+		min_5_iter2: # Update $s7 to fifth card and $s6 to the fifth card's rank
+			move $s7, $t0
+			addi $s7, $s7, 4
+			move $s6, $s5
+			
+			j loop_until_found_min_s2
+		
+		
+	iteration_three: # Iteration three we assume the third card is the minimum until proven
+		# Getting the card from memory
+		lbu $t3, 2($t0) # Third card
+		lbu $t4, 3($t0) # Fourth card
+		lbu $t5, 4($t0) # Fifth card
+	
+		and $s3, $t3, $t7 # ANDing $t3 and $t7 to get rank
+		and $s4, $t4, $t7 # ANDing $t4 and $t7 to get rank
+		and $s5, $t5, $t7 # ANDing $t5 and $t7 to get rank
+		
+		# We will assume that the address of the smallest rank is the third card
+		# Until proven
+		move $s7, $t0 # Getting the address in the main memory of the third card
+		addi $s7, $s7, 2 # We add two to get to the memory address of the third card
+		
+		move $s6, $s3 # We assume card #2 is the smallest until proven
+		
+		loop_until_found_min_s3: # This will run until we have found the smallest second card
+		# Here we will be doing the comparsion
+		bgt $s6, $s4, min_4_iter3 # Our assumption is greater than another value, $s4 update address to fourth card
+		bgt $s6, $s5, min_5_iter3 # Our assumption is greater than another value, $s5 update address to fifth card
+		
+		# If we are here then $s7 have the smallest card's address and we will be doing the swap
+		# We just have to swap the characters in the main memory between the third card
+		# With the smallest third card
+		lbu $s1, 0($s7) # We load the smallest card into a temp in $s1
+		sb $t3, 0($s7) # Put the third card in the smallest card's place
+		sb $s1, 2($t0) # Put the smallest card in the third place
+		
+		j iteration_four
+		
+		min_4_iter3: # Update $s7 to fourth card and $s6 to the fourth card's rank
+			move $s7, $t0
+			addi $s7, $s7, 3
+			move $s6, $s4
+			
+			j loop_until_found_min_s3
+			
+		min_5_iter3: # Update $s7 to fifth card and $s6 to the fifth card's rank
+			move $s7, $t0
+			addi $s7, $s7, 4
+			move $s6, $s5
+			
+			j loop_until_found_min_s3
+		
+	iteration_four: # Last iteration to sort the final two cards
+		# Getting the card from memory
+		lbu $t4, 3($t0) # Fourth card
+		lbu $t5, 4($t0) # Fifth card
+	
+		and $s4, $t4, $t7 # ANDing $t4 and $t7 to get rank
+		and $s5, $t5, $t7 # ANDing $t5 and $t7 to get rank
+		
+		# We will assume that the address of the smallest rank is the fourth card
+		# Until proven
+		move $s7, $t0 # Getting the address in the main memory of the fourth card
+		addi $s7, $s7, 3 # We add three to get to the memory address of the fourth card
+		
+		move $s6, $s4 # We assume card #4 is the smallest until proven
+	
+		loop_until_found_min_s4: # This will run until we have found the smallest second card
+		# Here we will be doing the comparsion
+		bgt $s6, $s5, min_5_iter4 # Our assumption is greater than another value, $s5 update address to fifth card
+		
+		# If we are here then $s7 have the smallest card's address and we will be doing the swap
+		# We just have to swap the characters in the main memory between the fourth card
+		# With the smallest third card
+		lbu $s1, 0($s7) # We load the smallest card into a temp in $s1
+		sb $t4, 0($s7) # Put the fourth card in the smallest card's place
+		sb $s1, 3($t0) # Put the smallest card in the fourth place
+		
+		j finished_sorting
+		
+		min_5_iter4: # Update $s7 to the fifth card and $s6 to the fifth's rank
+			move $s7, $t0
+			addi $s7, $s7, 4
+			move $s6, $s5
+			
+			j loop_until_found_min_s4
+			
+	finished_sorting:
+	# Finally finished sorting holy heck
+	# Now at addr_arg1 we have a sorted 5 hand card let's begin checking for poker hands
+	# Let's reload the addr into $t0 again and make sure we have the right thing
+	lw $t0, addr_arg1
+	
+	# We will have different sections for checking poker hands
+	# We will check for Bib bobtail first because it rank the highest
+	# Then we will have different labels for all the other ranks just in case
+	# If we skip any
+	check_big_booby:
+	
+	check_full_house:
+	
+	check_five_and_dime:
+	
+	check_skeet:
+	
+	check_blaze:
+	
+	just_high_noon:
+	
+	
+	j exit
 	
 valid_arg:
 	# For testing print purposes only
