@@ -1300,19 +1300,203 @@ option_p:
 		j exit
 	
 	check_full_house:
+		# If we are checking full house we don't care about the rank of the card
+		# There are two cases 3 3 3 2 2 or 2 2 3 3 3, there are no other way to arrange it
+		# If the cards are sorted
+		proceed_check_full_house_one: # Subcase # 1 for 3 3 3 2 2
+		# We branch away if the first three cards aren't equal
+		bne $t1, $t2, proceed_check_full_house_two # If the first two card's aren't equal check next subcase
+		bne $t1, $t3, proceed_check_full_house_two # If first and third aren't equal we go to subcase # 2
+		bne $t2, $t3, proceed_check_full_house_two # If second and third aren't equal we check subcase # 2
+		
+		# If we are here then first three cards are equal, now we just have to check last two cards
+		bne $t4, $t5, proceed_check_full_house_two # If fourth and fifth card aren't equal go to case # 2
+		
+		# If we are here then we just print full house string
+		li $v0, 4
+		la $a0, full_house_str
+		syscall
+		
+		# Exit after
+		j exit
+		
+		proceed_check_full_house_two: # Subcase # 2 for 2 2 3 3 3
+		# We branch to check five and dime if the first two cards aren't equal
+		bne $t1, $t2, check_five_and_dime # First two cards aren't equal
+		
+		# Now we have to check the last three cards must be equal and branch to check_five_and_dime
+		# If any of them aren't equal
+		bne $t3, $t4, check_five_and_dime # Card 3 and 4 aren't equal go check_five_and_dime
+		bne $t3, $t5, check_five_and_dime # Card 3 and 5 aren't equal go check_five_and_dime
+		bne $t4, $t5, check_five_and_dime # Card 4 and 5 aren't equal go check_five_and_dime
+	
+		# If we are here then that means first two cards are same, last three are same
+		# Hnece a full house
+		li $v0, 4
+		la $a0, full_house_str
+		syscall
+		
+		# Exit after
+		j exit
 	
 	check_five_and_dime:
+		# If we are here then we are checking for a low 5 and high 10
+		# If the lowest isn't 5 and highest isn't 10 then we go check skeet
+		# Let's store 5 into $t6 and 10 in $t7
+		li $t6, 5
+		li $t7, 10
+		
+		# If the first card isn't equal to 5 and last card isn't equal to 10 we branch to skeet
+		bne $t1, $t6, check_skeet # First card != 5
+		bne $t5, $t7, check_skeet # Fifth card != 10
+		
+		# If we are here then first card is 5 and fifth card is 10
+		# Now we just have to check none of the card is a pair
+		# But before we check, all three middle cards have to be bigger than 5 and less than 10
+		# Meaning no duplicates 
+		beq $t2, $t6, check_skeet # Meaning the second card is a 5 we go to check_skeet
+		beq $t2, $t7, check_skeet # Meaning the secondcard is a 10, check_skeet
+		
+		beq $t3, $t6, check_skeet # Meaning the third card is a 5 (I know this is impossible but I feelt better if I put it)
+		beq $t3, $t7, check_skeet # Meaning the third card is a 10, run to check_skeet
+		
+		beq $t4, $t6, check_skeet # Meaning the fourth card is a 5, check_skeet
+		beq $t4, $t7, check_skeet # Meaning the fourth card is a 10, check_skeet
+		
+		# Now if we are here then we know the three cards in the middle is between 6 - 9 inclusive
+		# We just have to check that none of them are the same, if they are check_skeet
+		beq $t2, $t3, check_skeet # If card 2 and card 3 are the same, not five and dime
+		beq $t2, $t4, check_skeet # If card 2 and card 4 are the same, not five and dime
+		beq $t3, $t4, check_skeet # If card 3 and card 4 are the same, not five and dime
+		
+		# If we are here none of them are duplicates, and all of them are higher than 5 and lower than 10
+		# Hence we print five and dime string
+		li $v0, 4
+		la $a0, five_and_dime_str
+		syscall
+		
+		j exit
 	
 	check_skeet:
+		# If we are here then we are checking for skeet, which means the highest card
+		# you can get is 9, and there must be a 2 and a 5 in the card with two other cards that aren't a
+		# pair, so the other two cards can't be 2 or 5 as well else it will form a pair
+		# Let's load 9 into $t6 for comparing the last card
+		li $t6, 9
+		
+		# We branch away if the last card isn't equal to 9
+		bne $t6, $t5, check_blaze # Last card is != 9 hence we go next and check_blaze
+		
+		# If we are here then last card is a 9, now we have to check for 2 and 5 in the card
+		# Let's check each card to make sure it is lower than 9
+		beq $t4, $t6, check_blaze # The fourth card is a 9 we can't have that
+		beq $t3, $t6, check_blaze # The third card is a 9 we can't have that
+		beq $t2, $t6, check_blaze # The second card is a 9 we can't have that
+		beq $t1, $t6, check_blaze # The first card is a 9 we can't have that
+		
+		# Now if we are here we are sure that all the rest of the cards are lower than 9
+		# Let's make sure none of the leftover 4 cards are duplicate first
+		beq $t1, $t2, check_blaze # First and second card are equal, no duplicates
+		beq $t1, $t3, check_blaze # First and third card are equal, no duplicates
+		beq $t1, $t4, check_blaze # First and fourth card are equal, no duplicates
+		beq $t2, $t3, check_blaze # Second and third card are equal, no duplicates
+		beq $t2, $t4, check_blaze # Second and fourth card are equal, no duplicates
+		beq $t3, $t4, check_blaze # Third and fourth card are equal, no dupliates
+		
+		# $t6 will store 2 for comparsion
+		# $t7 will store 5 for comparsion
+		li $t6, 2
+		li $t7, 5
+		
+		# If we are here then that makes no cards are duplicated now we can head into subcases where 2 and 5
+		# can be
+		in_12: # 2 and 5 are in first and second card
+		bne $t1, $t6, in_13 # The first card is not 2 then case 2
+		bne $t2, $t7, in_14 # The second card is not 5 then case 2
+		
+		# If we reached here then first two card is 2 5,
+		# And the third and forth aren't duplicated and is lower than 9 hence is a skeet
+		li $v0, 4
+		la $a0, skeet_str
+		syscall
+		
+		j exit
+		
+		in_13: # 2 and 5 are in first and third card
+		bne $t1, $t6, in_14 # The first card is not 2 then case 3
+		bne $t3, $t7, in_14 # The third card is not 5 then case 3
+		
+		# If we are here then first card is 2, third card is 5
+		# Second and forth is lower than 9 hence skeet
+		li $v0, 4
+		la $a0, skeet_str
+		syscall
+		
+		j exit
+		
+		in_14: # 2 and 5 are in first and forth card
+		bne $t1, $t6, in_23 # First card is not 2 then case 4
+		bne $t1, $t7, in_23 # Forth card is not 5 then case 4
+		
+		# If we are here then it is a skeet
+		li $v0, 4
+		la $a0, skeet_str
+		syscall
+		
+		j exit
+		
+		in_23: # 2 and 5 are in second and third card
+		bne $t2, $t6, in_24 # Second card is not 2 then case 5
+		bne $t3, $t7, in_24 # Third card is not 5 then case 5
+		
+		# If we are here then it is definitely a skeet
+		li $v0, 4
+		la $a0, skeet_str
+		syscall
+		
+		j exit
+		
+		in_24: # 2 and 5 are in second and forth card
+		bne $t2, $t6, check_blaze # Second card is not 2 then is never a skeet, check_blaze
+		bne $t4, $t7, check_blaze # Forth card is not 5 then it is never a skeet, check_blaze
+		
+		# But if we are here then it is a skeet
+		li $v0, 4
+		la $a0, skeet_str
+		syscall
+		
+		j exit
 	
 	check_blaze:
+		# Last case to check where all cards are Jack, Queens, and/or Kings
+		# Easiest case to check
+		# All we have to do is to make sure every single card's rank is greater than 10
+		# We will put 10 into $t6 for comparsion
+		li $t6, 10
+		
+		# If each card is less than or equal to 10 then we branch ot just_high_noon
+		ble $t1, $t6, just_high_noon # Card 1 is less than or equal to 10 can't be J,Q,K
+		ble $t2, $t6, just_high_noon # Card 2 is less than or equal to 10 can't be J,Q,K
+		ble $t3, $t6, just_high_noon # Card 3 is less than or equal to 10 can't be J,Q,K
+		ble $t4, $t6, just_high_noon # Card 4 is less than or equal to 10 can't be J,Q,K
+		ble $t5, $t6, just_high_noon # Card 5 is less than or equal to 10 can't be J,Q,K
+		
+		# Now if we are here then all cards  are J,Q, and/or K
+		li $v0, 4
+		la $a0, blaze_str
+		syscall
+		
+		j exit
 	
 	just_high_noon:
-	
-	li $a0, 69
-	li $v0, 1
-	syscall
-	j exit
+		# If we are here then is everything else
+		li $v0, 4
+		la $a0, high_card_str
+		syscall
+		
+		j exit
+
+	# And we are DONE!
 	
 valid_arg:
 	# For testing print purposes only
