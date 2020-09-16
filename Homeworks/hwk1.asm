@@ -1412,7 +1412,7 @@ option_p:
 		# can be
 		in_12: # 2 and 5 are in first and second card
 		bne $t1, $t6, in_13 # The first card is not 2 then case 2
-		bne $t2, $t7, in_14 # The second card is not 5 then case 2
+		bne $t2, $t7, in_13 # The second card is not 5 then case 2
 		
 		# If we reached here then first two card is 2 5,
 		# And the third and forth aren't duplicated and is lower than 9 hence is a skeet
@@ -1436,7 +1436,7 @@ option_p:
 		
 		in_14: # 2 and 5 are in first and forth card
 		bne $t1, $t6, in_23 # First card is not 2 then case 4
-		bne $t1, $t7, in_23 # Forth card is not 5 then case 4
+		bne $t4, $t7, in_23 # Forth card is not 5 then case 4
 		
 		# If we are here then it is a skeet
 		li $v0, 4
