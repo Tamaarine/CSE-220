@@ -1,6 +1,6 @@
 .data
 ciphertext_alphabet: .ascii "drfXArg153cyIJvv2dkivJvSpka5BXf4MyeauUCg5cfQjiY6bs6BKEqE1cXtvHZ"
-keyphrase: .ascii "Stony Brook University\0"
+keyphrase: .ascii "Stony? ?Brook? ?UniversityStony? ?Brook? ?UniversityStony? ?Brook? ?UniversityStony? ?Brook? ?UniversityMonday,? ?September? ?21st,? ?2020? ?4:39? ?PM? ?EDTMonday,? ?September? ?21st,? ?2020? ?4:39? ?PM? ?EDT"
 
 .text
 .globl main
