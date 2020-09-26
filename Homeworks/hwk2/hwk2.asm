@@ -210,6 +210,7 @@ to_lowercase:
     jr $ra
 
 generate_ciphertext_alphabet:
+    move $s7, $a0
     # If we are here then our text is to generate a set of ciphertext_alphabet using the
     # given keyphase. We append any unused letter in the keyphase, lower case letter first, then
     # we append upper case, then lastly the digits
@@ -222,360 +223,419 @@ generate_ciphertext_alphabet:
     # Output -> $v0 will be storing the number of unique, case-sensitive, numerical characters
     # we extracted from keyphase. Basically how many characters we have used in keyphase
     
-    # $s0 will be storing the growing length of the letters we have extracted from keyphase
-    # So when we use indexOf, we will be comparing the result using $s0, if it is -1 or anything bigger than
-    # $s0, we know it is not part of the actual alphabet in making so we append the letter to it
-    li $s0, 0
-
-    # We know that $a0 must be null terminated at the [62] byte, we need to do it now or else
-    # indexOf won't know where to stop
+    # Let's allocate 62 byte of array in the run time stack for us to store the
+    # boolean of each array, we put a 1 if it exist in the keyphase, 0 if it doesn't exist
+    # So initially everything is 0 then we will just have to loop through the keyphase to pick out
+    # Which one exist and which one doesn't
+    
+    # Let's first allocate 64 byte of array, we want the pointer to be word aligned
+    # We will have 2 extra byte, we have to deal with it
+    addi $sp, $sp, -64
+    
+    # Now because we can't assume the memory is 0 in the beginning we have to make them all 0
+    # It is from 0 to 61 immediates to add to $sp to get the effective address
+    # So that means our for loop must travel 61 times
+    li $t0, 62 # Let's store our < 62 in $t0
+    li $t1, 0 # This is our for loop counter
+    
+    # We make a copy of $sp to be the one incrementing in $t2
+    move $t2, $sp
+    
+    # 335 instructions not that bad
+    # This loop will set everything on the 62 byte that we allocate to 0
+    for_loop_to_clean_run_time_stack:
+    	# If the counter reached 62 then we have already runned it 61 times that's it
+    	# We are done
+    	beq $t0 $t1, finished_clean_stack_loop
+    	
+    	# Then we store 0 at each index of the run time stack using $t2
+    	# since that is the one we are using to increment
+    	sb $0, 0($t2)
+    	
+    	# Then don't forget to increment the $t2 and our loop counter
+    	addi $t2, $t2, 1 # Our $sp address pointer
+    	addi $t1, $t1, 1 # Our loop counter
+    	
+    	# Jump back up
+    	j for_loop_to_clean_run_time_stack
+    	
+    finished_clean_stack_loop:
+    # Outside of the loop the 62 byte of stack memory we allocate should all be 0
+    
+    # We have to keep track of how many letters we have extracted from the keyphase
+    # Let's store it in $s0
+    li $s0, 0 # Counter for the letter collected from keyphase
+    
+    # We know that $a0 must be null terminated at the [62] byte let's just do it now to get it out of the way
     sb $0, 62($a0) # Store a null terminator at the last byte of the 63 byte
-            
-    # We have to use a copy of $a0 to do the incrementation for storing the bytes in the alphabet
-    # Because when we call indexOf it needs the starting address of the String, not somewhere in between
-    # We will store the one where we increment to advance to the next character to replace in $s2
-    move $s2, $a0
     
-    # Another copy to restore it after
-    move $s7, $a0
-    
-    # We will be using a for loop to go through the entire keyphase before 
-    # Using 3 more for loop to add any remaining unused lower, upper, digit symbols
+    # Now we can loop through the keyphase and do our thing
+    # We will be using a for loop to go through the entire keyphase to extract
+    # all the valid characters to be added to the real alphabet
     for_loop_to_generate_alphabet:
-	# $s1 will be storing each letter from the keyphase
-	lbu $s1, 0($a1) # Loading each character from $a1
+    	# We will load each character from the keyphase into register $t0
+    	lbu $t0, 0($a1)
+    	
+    	# This will be the stopping condition, once the loop hit null terminator it will stop
+	beq $t0, $0, finished_generating_alphabet
+    
+    	# Now we MUST make sure it is a uppercase, lowercase, or digit symbol before we add it into alphabet
+	# Code below will determine whether or not this character we got is upper,lower, or digit
 	
-	# This will be the stopping condition, once the loop hit null terminator it will stop
-	beq $s1, $0, finished_generating_alphabet
-	
-	# Now we MUST make sure it is a uppercase, lowercase, or digit symbol before using indexOf function
-	# Things below will determine whether or not this character we got is a valid character we can use indexOf
-	# Load everything onto register $t7
+	# We load all the ascii value to compare into register $t7
 	# Load 48 onto $t7
 	li $t7, 48
-	blt $s1, $t7, invalid_characters # The char is less than 48 can't be good
+	blt $t0, $t7, invalid_characters # The char is less than 48 can't be good
 
 	# Load 122 onto $t7
 	li $t7, 122
-	bgt $s1, $t7, invalid_characters # The char is greater than 122 can't be good
+	bgt $t0, $t7, invalid_characters # The char is greater than 122 can't be good
 
 	# For sure between 48 and 122 inclusive
 	# Load 57 onto $t7
 	li $t7, 57
-	ble $s1, $t7, upper_lower_or_digit # We know 100% that the given character is a number ascii
+	ble $t0, $t7, character_is_a_digit # We know 100% that the given character is a number ascii
 
 	# Here then is between 58 and 122 inclusive
 	# Load 65 onto $t7
 	li $t7, 65
-	blt $s1, $t7, invalid_characters # Between 58 to 64 inclusive can't be good
+	blt $t0, $t7, invalid_characters # Between 58 to 64 inclusive can't be good
 
 	# Here we know for sure is from 65 and 122 inclsuive
 	# Load 90 onto $t7
 	li $t7, 90
-	ble $s1, $t7, upper_lower_or_digit # Between 65 and 90 inclusive for sure it is a upper case letter
+	ble $t0, $t7, character_is_a_uppercase # Between 65 and 90 inclusive for sure it is a upper case letter
 
 	# If here we know is between 91 and 122 inclusive
 	# Load 97 onto $t7
 	li $t7, 97
-	blt $s1, $t7, invalid_characters # Between 91 to 96 inclusive can't be good
+	blt $t0, $t7, invalid_characters # Between 91 to 96 inclusive can't be good
 
 	# Here it means is definitely a lower case letter
-	j upper_lower_or_digit # Just go to good
-
-	invalid_characters:
-		# This means that we have encountered a puncutation in the keyphase
-		# which we don't care about so we just skip to the next character
-		addi $a1, $a1, 1 # Incrementing the address to get the next character
+	j character_is_a_lowercase # Just go to good
+	
+	# The reason why we separate them into different cases is because so we know
+	# Where to put the boolean value in array we have allocated
+	# This branch is for if the character is a digit
+	character_is_a_digit:
+		# Any digit have ascii from 48 to 57 inclusive
+		# We will map it into 0 to 9 inclusive region of our array
+		# The way we going to do this is to subtract the ascii value by 48 to get our 
+		# offset for the effective address
+		# Load 48 into our register $t1 for subtraction
+		li $t1, 48 
 		
-		# Jump back up the loop
-		j for_loop_to_generate_alphabet
-
-	upper_lower_or_digit:
-		# This means that we have encountered a upper, lower, or digit character
-		# Now we must use indexOf to see if it is already inside the keyphase
-		# Before appending it
+		# We can store the effective offset in $t2 because it is free
+		sub $t2, $t0, $t1
 		
-		# Before calling it we have to store $ra of generate_ciphertext_alphabet else
-		# it won't know where to return to
-		addi $sp, $sp, -4 # Allocate 4 bytes for the return address
+		# Add it with $sp to get our effective address
+		add $t2, $t2, $sp
 		
-		sw $ra, 0($sp) # Store this method's return address onto the stack
+		# Now $t2 the effective address for this character, we need to get the byte from the stack
+		# To see whether or not we append this character or we don't
+		lbu $t3, 0($t2) # Getting the boolean value for this character from the array
 		
-		# Yikes we also have to store $a1's address or else it will be overwritten by index_of because
-		# we are giving it the letter we want to look at
-		# We can store $a1 which is the current keyphase's address in $s3 and restore it later
-		move $s3, $a1 # Storing $a1 in register $s3, make sure to restore it later
+		# After getting the boolean value from the array in stack, $t3, we check whether or not
+		# this character is in the array already. We append if it is equal to 0, don't if it is 1
+		bne $t3, $0, skip_append_digit_character # We branch if the boolean value is true, already appended
+	
+		# If we are here then 	
+		# We know that the digit is not in the array yet so we append it to the alphabet using $a0
+		sb $t0, 0($a0)
 		
-		# Now we can safely call jal index_of without worrying anything
-		# $s7 -> $a0 because that is the inital copy of the starting address of alphabet
-		move $a0, $s7
-		
-		# $a1 we have to give it the character we want it to look for which is in $s1
-		# $s1 -> $a1
-		move $a1, $s1
-		
-		# $a2 is the position we want to start looking at, just give 0
-		li $a2, 0
-		
-		# Now we can call jal index_of
-		jal index_of
-		
-		# Right after we call index_of let's restore $a1 from $s1
-		# So we can have our keyphase's position back
-		move $a1, $s3
-		
-		# Once we are out of here we know $v0 have our index position
-		# If it is -1 we append, 100% we load -1 in $t0
-		li $t0, -1
-		beq $v0, $t0, append_letter_into_alphabet
-		
-		# If the return index that is found is GREATER THAN OR EQUAL TO the real alphabet length counter
-		# We know it is definitely not part of the alphabet hence we have to append to alphabet
-		bge $v0, $s0, append_letter_into_alphabet 
-		
-		# If we are here then that means the letter is already present in the alphabet
-		# We don't have to add it hence we just increment keyphase address
-		addi $a1, $a1, 1
-		
-		# Then we jump to finish_handling_upper_lower_digit
-		j finish_handling_having_upper_lower_digit
-		
-		append_letter_into_alphabet:
-		# But if we are here that means we have to add it to the alphabet because
-		# We don't have it in the cyphertext_alphabet
-		sb $s1, 0($s2) # We store the unadded alphabet into the real alphabet using $s2
-		
-		# Then we increment the keyphase address and real alphabet address to get to the
-		# next position for replacement
-		addi $s2, $s2, 1
-		addi $a1, $a1, 1
-		
-		# Also increment alphabet counter
+		# After adding we need to increment the counter
 		addi $s0, $s0, 1
 		
-		finish_handling_having_upper_lower_digit:
-		# Restore the $ra DON'T FORGET
-		lw $ra, 0($sp)
+		# We need to increment keyphase address
+		addi $a1, $a1, 1
 		
-		# Then deallocate the 4 byte we used
-		addi $sp, $sp, 4
-	
-		# Then we jump back up the loop for next character
+		# We need to increment alphabet address to point to the next position
+		addi $a0, $a0, 1
+		
+		# We also have to put 1 into our array to signal that it is true
+		addi $t3, $t3, 1 # Add 1 to the 0 then store it back using $t2 which is our effective address
+		sb $t3, 0($t2) # Storing 1 into the array
+		
+		# Then we jump to the next iteration
 		j for_loop_to_generate_alphabet
-	
-    finished_generating_alphabet:   
-    	# Outside of the for loop that means we finished extracting letter from keyphase
-    	# Now we just have to add the leftover from all the rest
-	
-    	# The registers we have to keep in mind is
-    	# $s0 -> The real alphabet length counter our $v0 output
-    	# $s2 -> Holds the first position where to put upper, lower, digit character in alphabet
-    	# $s7 -> Contains the initial starting address of the alphabet
-    	# The rest we are all free to use
-    	
-    	# Load the beginning of a
-    	li $s3, 'a'
-    	
-    	# Load the ending of Z
-    	li $s4, '{'
-    	
-    	# We start with lower case letters
-    	for_loop_to_add_lowercase:
-    		# If we are here we have to call indexOf to check whether or not that
-    		# letter is used in alphabet which $s3
-    		move $a1, $s3 # Move the character we looking for into $a1
-    		
-    		# s7 -> a0
-    		move $a0, $s7
-    		
-    		# 0 -> a2
-    		li $a2, 0
+		
+		skip_append_digit_character:
+			# If we are here then that means the character is already added
+			# We just need to increment keyphase address nothing else
+			addi $a1, $a1, 1
+			
+			# Then jump to next iteration
+			j for_loop_to_generate_alphabet
 
-    		# If we hit the { character we finished adding all the lower case characters
-    		beq $s3, $s4, finished_loop_to_add_lowercase
-    		
-    		# Before calling it we have to store $ra of generate_ciphertext_alphabet else
-		# it won't know where to return to
-		addi $sp, $sp, -4 # Allocate 4 bytes for the return address
+	character_is_a_uppercase:
+		# Any upper case letter will have ascii value from 65 to 90 inclusive
+		# We will be mapping it to the 10 to 35 inclusive region of our array
+		# The way we are just going to be doing this is to subtract the ascii value
+		# by 55 to get our offset for the effective address
+		# Let's load 55 into $t1
+		li $t1, 55
 		
-		sw $ra, 0($sp) # Store this method's return address onto the stack
+		# Then we can store our offset into $t2
+		sub $t2, $t0, $t1
 		
-		# Calling the function
-		jal index_of
+		# Then we add it with $sp to get our effective address
+		add $t2, $t2, $sp
 		
-		# After calling we know $v0 contains the index of each lower case character in 
-		# the alphabet
+		# Now after we get our effective address we need to get the actual boolean value
+		# To see whether or not this character is already in the alphabet
+		# We will store it in $t3
+		lbu $t3, 0($t2)
 		
-		# If $v0 is equal to -1 we definitely append
-		# Store -1 into $t1
-		li $t1, -1
-		beq $v0, $t1, append_letter_from_lowercase
+		# Now we check, if the boolean is not a 0 then we skip adding it because it is already
+		# in the alphabet
+		bne $t3, $0, skip_append_uppercase_character
 		
-		# If $v0 is greater than or equal to $s0 we append for sure
-		bge $v0, $s0, append_letter_from_lowercase
+		# But if it is 0 then we have to append it to the alphabet using $a0
+		sb $t0, 0($a0)
 		
-		# We only have to increment to next letter but not $s2
-		addi $s3, $s3, 1
+		# After adding it to the alphabet we have to increment the counter
+		addi $s0, $s0, 1
 		
-		j finished_append_letter_from_lowercase
+		# We need to increment keyphase address
+		addi $a1, $a1, 1
 		
-		append_letter_from_lowercase:
-    		# We just store the byte at $s2 then finished
-    		sb $s3, 0($s2)
-    		
-    		# We have to increment to the next letter also $s2
-    		addi $s3, $s3, 1
-    		addi $s2, $s2, 1
-    		
-    		finished_append_letter_from_lowercase:
-    		# Restore the $ra DON'T FORGET
-		lw $ra, 0($sp)
+		# We need to increment alphabet address
+		addi $a0, $a0, 1
 		
-		# Then deallocate the 4 byte we used
-		addi $sp, $sp, 4
-    		
-    		# Jump back up the loop
-    		j for_loop_to_add_lowercase
-    		
-    	finished_loop_to_add_lowercase:
-    	
-    	# Load the beginning of A
-    	li $s3, 'A'
-    	
-    	# Load the ending of Z
-    	li $s4, '['
-    	
-    	# Then we proceed with uppercase letters
-    	for_loop_to_add_uppercase:
-    		# If we are here we have to call indexOf to check whether or not that
-    		# letter is used in alphabet which $s3
-    		move $a1, $s3 # Move the character we looking for into $a1
-    		
-    		# s7 -> a0
-    		move $a0, $s7
-    		
-    		# 0 -> a2
-    		li $a2, 0
-
-    		# If we hit the { character we finished adding all the lower case characters
-    		beq $s3, $s4, finished_loop_to_add_uppercase
-    		
-    		# Before calling it we have to store $ra of generate_ciphertext_alphabet else
-		# it won't know where to return to
-		addi $sp, $sp, -4 # Allocate 4 bytes for the return address
+		# We also have to put 1 into our array to signal that it is true
+		addi $t3, $t3, 1 # Add 1 to the 0 then store it back using $t2 which is our effective address
+		sb $t3, 0($t2) # Storing 1 into the array
 		
-		sw $ra, 0($sp) # Store this method's return address onto the stack
+		# Then we jump to the next iteration
+		j for_loop_to_generate_alphabet
 		
-		# Calling the function
-		jal index_of
+		skip_append_uppercase_character:
+			# If we are here then that means the character is already added
+			# We just need to increment keyphase address nothing else
+			addi $a1, $a1, 1
+			
+			# Then jump to next iteration
+			j for_loop_to_generate_alphabet
 		
-		# After calling we know $v0 contains the index of each lower case character in 
-		# the alphabet
+	character_is_a_lowercase: 
+		# Any lower case letter will have ascii value from 97 to 122 inclusive
+		# We will be mapping it to the 36 to 61 inclusive region of our array
+		# Same thing with upper case we are just going to be subtracting 61 from our sscii value
+		# to get our offset for the effective address
+		# Let's load 61 into $t1
+		li $t1, 61
 		
-		# If $v0 is equal to -1 we definitely append
-		# Store -1 into $t1
-		li $t1, -1
-		beq $v0, $t1, append_letter_from_uppercase
+		# Then we can just store our offset into $t2
+		sub $t2, $t0, $t1
 		
-		# If $v0 is greater than or equal to $s0 we append for sure
-		bge $v0, $s0, append_letter_from_uppercase
+		# Next is our effective address
+		add $t2, $t2, $sp
 		
-		# We only have to increment to next letter but not $s2
-		addi $s3, $s3, 1
+		# Same thing after we get our effective address we need the boolean value
+		# Store it in $t3
+		lbu $t3, 0($t2)
 		
-		j finished_append_letter_from_uppercase
+		# Now we check, if the boolean is not a 0 then we skip adding it because it is already
+		# in the alphabet
+		bne $t3, $0, skip_append_lowercase_character
 		
-		append_letter_from_uppercase:
-    		# We just store the byte at $s2 then finished
-    		sb $s3, 0($s2)
-    		
-    		# We have to increment to the next letter also $s2
-    		addi $s3, $s3, 1
-    		addi $s2, $s2, 1
-    		
-    		finished_append_letter_from_uppercase:
-    		# Restore the $ra DON'T FORGET
-		lw $ra, 0($sp)
+		# But if it is 0 then we have to append it to the alphabet using $a0
+		sb $t0, 0($a0)
 		
-		# Then deallocate the 4 byte we used
-		addi $sp, $sp, 4
-    		
-    		# Jump back up the loop
-    		j for_loop_to_add_uppercase
-    		
-    	finished_loop_to_add_uppercase:
-    	
-    	# Load the beginning of 0
-    	li $s3, '0'
-    	
-    	# Load the ending of 9
-    	li $s4, ':'
-    	
-    	# Then we proceed with digits
-    	for_loop_to_add_digit:
-    		# If we are here we have to call indexOf to check whether or not that
-    		# letter is used in alphabet which $s3
-    		move $a1, $s3 # Move the character we looking for into $a1
-    		
-    		# s7 -> a0
-    		move $a0, $s7
-    		
-    		# 0 -> a2
-    		li $a2, 0
-
-    		# If we hit the { character we finished adding all the lower case characters
-    		beq $s3, $s4, finished_loop_to_add_digit
-    		
-    		# Before calling it we have to store $ra of generate_ciphertext_alphabet else
-		# it won't know where to return to
-		addi $sp, $sp, -4 # Allocate 4 bytes for the return address
+		# After adding it to the alphabet we have to increment the counter
+		addi $s0, $s0, 1
 		
-		sw $ra, 0($sp) # Store this method's return address onto the stack
+		# We need to increment keyphase address
+		addi $a1, $a1, 1
 		
-		# Calling the function
-		jal index_of
+		# We need to increment alphabet address
+		addi $a0, $a0, 1
 		
-		# After calling we know $v0 contains the index of each lower case character in 
-		# the alphabet
+		# We also have to put 1 into our array to signal that it is true
+		addi $t3, $t3, 1 # Add 1 to the 0 then store it back using $t2 which is our effective address
+		sb $t3, 0($t2) # Storing 1 into the array
 		
-		# If $v0 is equal to -1 we definitely append
-		# Store -1 into $t1
-		li $t1, -1
-		beq $v0, $t1, append_letter_from_digit
+		# Then we jump to the next iteration
+		j for_loop_to_generate_alphabet
 		
-		# If $v0 is greater than or equal to $s0 we append for sure
-		bge $v0, $s0, append_letter_from_digit
-		
-		# We only have to increment to next letter but not $s2
-		addi $s3, $s3, 1
-		
-		j finished_append_letter_from_digit
-		
-		append_letter_from_digit:
-    		# We just store the byte at $s2 then finished
-    		sb $s3, 0($s2)
-    		
-    		# We have to increment to the next letter also $s2
-    		addi $s3, $s3, 1
-    		addi $s2, $s2, 1
-    		
-    		finished_append_letter_from_digit:
-    		# Restore the $ra DON'T FORGET
-		lw $ra, 0($sp)
-		
-		# Then deallocate the 4 byte we used
-		addi $sp, $sp, 4
-    		
-    		# Jump back up the loop
-    		j for_loop_to_add_digit
-    		
-    	finished_loop_to_add_digit:
-    	# Let's just print what $a0 have
-    	move $a0, $s7
-    	li $v0, 4
-    	syscall
-    	
+		skip_append_lowercase_character:
+			# If we are here then that means the character is already added
+			# We just need to increment keyphase address nothing else
+			addi $a1, $a1, 1
+			
+			# Then jump to next iteration
+			j for_loop_to_generate_alphabet
 	
+	invalid_characters:
+		# If we are here then that means the character is not a uppercase,lowercase, or a digit
+		# We just have to increment keyphase address and jump to next iteration
+		addi $a1, $a1, 1
+			
+		# Then jump to next iteration
+		j for_loop_to_generate_alphabet
+    
+    finished_generating_alphabet:
+    # If we are here then that means the for loop have finished extracting all the valid characters
+    # from the keyphase, we just have to append the left overs
+    # Registers to keep in mind
+    # $s0 -> Is number of letters we extracted from keyphase our output
+    # $a0 -> Currently stores the next position to place the alphabets
+    
+    # We really just need 3 more for loop to append the leftover characters
+    # We need to start with lowercase letters first
+    # Let's load in the ascii a into $t0 register
+    # and z into ascii $t1
+    li $t0, 'a'
+    li $t1, 'z'
+    
+    # Then this is our for loop to take in all the left over lowercase letters
+    for_loop_leftover_lowercase:
+    	# First let's set the condition for continuation and end of the loop
+    	bgt $t0, $t1, out_lowercase # If we finished picking lowercase go to uppercase
+    	
+    	# Now again we have to get the offset for the effective address before we know
+    	# Whether or not we have used this letter yet
+    	# To get the offset remember we subtract 61
+    	# Let's load 61 into $t2
+    	li $t2, 61
+    	
+    	# Then we subtract with $t0 to get our offset and put it into $t3
+    	sub $t3, $t0, $t2
+    	
+    	# Then to get our effective address we add it into $t3 $sp
+    	add $t3, $t3, $sp
+    	
+    	# Then we can load in the boolean value from effective address into $t4
+    	lbu $t4, 0($t3)
+    	
+    	# We branch away if the letter's boolean value is not 0 because we already have it in our alphabet
+    	bne $t4, $0, skip_leftover_lowercase
+    	
+    	# But if we are here then we have to append it into our alphabet using $a0 and $t0
+    	sb $t0, 0($a0)
+    	
+    	# After appending we have to only increment $a0 and $t0
+    	addi $a0, $a0, 1 # For next position
+    	addi $t0, $t0, 1 # For next letter
+    	
+    	# Storing the boolean value back is not needed
+    	# Then we jump to next iteration
+    	j for_loop_leftover_lowercase
+    	
+    	skip_leftover_lowercase:
+    	# If we skip then we just have to increment for next letter and jump back
+    	addi $t0, $t0, 1
+    
+    	j for_loop_leftover_lowercase
+    
+    # Outside of the previous's for loop
+    out_lowercase:
+    # We have to load in A into $t0
+    # and Z into $t1
+    li $t0, 'A'
+    li $t1, 'Z'
+    
+    # Next is the loop for adding in the leftover uppercase letters
+    for_loop_leftover_uppercase:
+    	# First let's set the condition for continuation and end of the loop
+    	bgt $t0, $t1, out_uppercase # If we finished picking upper go to digit
+    	
+    	# Now again we have to get the offset for the effective address before we know
+    	# Whether or not we have used this letter yet
+    	# To get the offset remember we subtract 55
+    	# Let's load 55 into $t2
+    	li $t2, 55
+    	
+    	# Then we subtract with $t0 to get our offset and put it into $t3
+    	sub $t3, $t0, $t2
+    	
+    	# Then to get our effective address we add it into $t3 $sp
+    	add $t3, $t3, $sp
+    	
+    	# Then we can load in the boolean value from effective address into $t4
+    	lbu $t4, 0($t3)
+    	
+    	# We branch away if the letter's boolean value is not 0 because we already have it in our alphabet
+    	bne $t4, $0, skip_leftover_uppercase
+    	
+    	# But if we are here then we have to append it into our alphabet using $a0 and $t0
+    	sb $t0, 0($a0)
+    	
+    	# After appending we have to only increment $a0 and $t0
+    	addi $a0, $a0, 1 # For next position
+    	addi $t0, $t0, 1 # For next letter
+    	
+    	# Storing the boolean value back is not needed
+    	# Then we jump to next iteration
+    	j for_loop_leftover_uppercase
+    	
+    	skip_leftover_uppercase:
+    	# If we skip then we just have to increment for next letter and jump back
+    	addi $t0, $t0, 1
+    
+    	j for_loop_leftover_uppercase
+    	
+    # Outside of the previous for loop
+    out_uppercase:
+    # We have to put 0 in $t0
+    # and 9 in $t1
+    li $t0, '0'
+    li $t1, '9'
+    
+    # Lastly, the leftover we have to add in is digits
+    for_loop_leftover_digit:
+    # First let's set the condition for continuation and end of the loop
+    	bgt $t0, $t1, complete_algorithm # If we finished picking upper go to digit
+    	
+    	# Now again we have to get the offset for the effective address before we know
+    	# Whether or not we have used this letter yet
+    	# To get the offset remember we subtract 48
+    	# Let's load 48 into $t2
+    	li $t2, 48
+    	
+    	# Then we subtract with $t0 to get our offset and put it into $t3
+    	sub $t3, $t0, $t2
+    	
+    	# Then to get our effective address we add it into $t3 $sp
+    	add $t3, $t3, $sp
+    	
+    	# Then we can load in the boolean value from effective address into $t4
+    	lbu $t4, 0($t3)
+    	
+    	# We branch away if the letter's boolean value is not 0 because we already have it in our alphabet
+    	bne $t4, $0, skip_leftover_digit
+    	
+    	# But if we are here then we have to append it into our alphabet using $a0 and $t0
+    	sb $t0, 0($a0)
+    	
+    	# After appending we have to only increment $a0 and $t0
+    	addi $a0, $a0, 1 # For next position
+    	addi $t0, $t0, 1 # For next letter
+    	
+    	# Storing the boolean value back is not needed
+    	# Then we jump to next iteration
+    	j for_loop_leftover_digit
+    	
+    	skip_leftover_digit:
+    	# If we skip then we just have to increment for next digit and jump back
+    	addi $t0, $t0, 1
+    
+    	j for_loop_leftover_digit
+    
+    complete_algorithm:
+    # Finally if we here then everything is added in we just have to move $s0 into $v0 and return
+    move $v0, $s0
+    
+    # Don't forget to deallocate the 64 byte that we have used
+    addi $sp, $sp, 64
+    
+    # Holy hell that is such a big improvement in efficency after i used an array
+    # damn that is impressive from my 100,000 instruction run from the first time i wrote this
+    # Let's test its efficiency
+    move $a0, $s7
+    li $v0, 4
+    syscall
+    
     jr $ra
 
 count_lowercase_letters:
