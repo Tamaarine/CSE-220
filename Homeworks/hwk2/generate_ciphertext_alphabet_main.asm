@@ -59,16 +59,28 @@ keyphrase13: .asciiz ""
 # Answer: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 keyphrase14: .asciiz "   - - - -          "
 
+# Tested
+keyphrase15: .asciiz "Stony? ?Brook? ?University"
+
+# Tested
+keyphrase16: .asciiz "Monday,? ?September? ?21st,? ?2020? ?4:39? ?PM? ?EDT"
+
+# Tested
+keyphrase17: .asciiz "suPeRcalIfrAgiListICexPiaLIdoCIOus"
+
 .text
 .globl main
 main:
 	la $a0, ciphertext_alphabet
-	la $a1, keyphrase14
+	la $a1, keyphrase17
 	
 	jal generate_ciphertext_alphabet
 	
 	# You must write your own code here to check the correctness of the function implementation.
 	# Because the value is returned in $v0, we move it to $a0 to see if it is correct
+	move $a0, $v0
+	li $v0, 1
+	syscall
 	
 	li $v0, 10
 	syscall

@@ -3,10 +3,16 @@ hex: .asciiz "89"
 
 
 .text
-li $s1, 0xFFFF # Resetting register $t5
-li $t1, 1 # Load 1 into $t1 and attempt to use this as our immediate
+li $t0, 3
+li $t1, 13
 
-sllv $s1, $s1, $t1
-	
+mult $t0, $t1
+mflo $a0
+
+mul $a0, $t0, $t1
+li $v0, 1
+syscall
+
+
 	
 		

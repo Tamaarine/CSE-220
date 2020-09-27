@@ -210,7 +210,6 @@ to_lowercase:
     jr $ra
 
 generate_ciphertext_alphabet:
-    move $s7, $a0
     # If we are here then our text is to generate a set of ciphertext_alphabet using the
     # given keyphase. We append any unused letter in the keyphase, lower case letter first, then
     # we append upper case, then lastly the digits
@@ -631,14 +630,132 @@ generate_ciphertext_alphabet:
     
     # Holy hell that is such a big improvement in efficency after i used an array
     # damn that is impressive from my 100,000 instruction run from the first time i wrote this
-    # Let's test its efficiency
-    move $a0, $s7
-    li $v0, 4
-    syscall
     
     jr $ra
 
 count_lowercase_letters:
+    # If we are here then that means we are taking a String of messages and then count
+    # every lower case letter's occurences in the String, we store the occurences in an array
+    # where each word represent a letter starting from a ends at z
+    # Rememeber we are dealing with words not with byte!
+    
+    # $a0 -> is the array where we are storing the frequency of each lower case letter
+    # we must clean it before we use it because it might be filled with all garbages and not 0s
+    # $a1 -> this is our message String that we are going to loop through and extract each
+    # letter to count the lowercase from
+    # Output -> $v0, we are going to return the total count of lowercase letters in messages
+    
+    # Since we have 26 letters we will go up the byte index until 104 stopping before hitting 104 at 100
+    # indexing we will be using $t0 to keep track of the index we are at, and $t1 as
+    # the byte length for stopping condition. 0 to 100 is 26 byte
+    li $t0, 0 # Our for loop and index counter
+    li $t1, 104 # Our stopping goal 
+    
+    # So before we do anything let's each word of our given array
+    for_loop_to_clean_array:
+    	# This is our stopping condition, if our byte index is less than
+    	# 104 then we are still in a valid index
+    	# But once it hit 104 we are done, if we clean 104th byte's word then we are doing 27
+    	# words not 26 anymore
+    	bge $t0, $t1, finished_cleaning_array # If our byte counter is greater than or equal to 104 we are done
+    	
+    	# If we are here then we have to clean the word by storing $0 into that word
+    	# Let's get our effective address by adding $t0 with $a0 and store it in $t2
+    	add $t2, $t0, $a0
+    	
+    	# Then we just have to store $0 into $t2 because that is the effective address already
+    	sw $0, 0($t2)
+    	
+    	# Then we have to increment our byte index counter by 4
+    	addi $t0, $t0, 4
+    	
+    	# And jump back up the loop
+    	j for_loop_to_clean_array
+    
+    finished_cleaning_array:
+    # If we are here then that means we have clean everything from 0 to 25 word
+    # They are all 0 now and we can start working on the array
+    
+    # Let's load 97 into $t1
+    # And 122 into $t2
+    # This is for comparsion to make sure it is a lowercase letter
+    li $t1, 97
+    li $t2, 122
+    
+    # Now we also have to keep track of a counter for the total number of lowercase letter we counted
+    # We will put it in register $s0
+    li $s0, 0
+    
+    # We are going to loop through the entire messsages, load one byte at a time
+    # Then add in the values to the respected array word if it is a lowercase letter
+    for_loop_to_count_lowercase:
+    	# Keep in mind these registers
+    	# $a0 -> Is the starting address of our array accessed through offset of multiple of 4, for word!
+    	# $a1 -> Is the starting address of the message
+    	# We will store each character in register $t0
+    	lbu $t0, 0($a1) # Loading each character in message
+    	
+    	# Our loop stopping condition is when we hit the null terminator in message
+    	beq $t0, $0, finished_counting_lowercase_loop
+    	
+    	# Now before we do more work we have to make sure that it is a lowercase letter
+    	# which have ascii value between 97 and 122 inclusive
+    	blt $t0, $t1, skip_to_next_letter_to_count # The character have ascii value less than 97 definitely not lowercase
+    	bgt $t0, $t2, skip_to_next_letter_to_count # The character have ascii value greater than 122 definitely not lowercase
+    	
+    	# Now if we are here then it is for sure that the character is lowercase
+    	# We just have to increment it in our array of integers
+    	# To do that we have to get our effective offsets of the index, which
+    	# we can do by subtracting 97 from our lowercase letter 
+    	# Let's store the index offset into register $t3
+    	sub $t3, $t0, $t1
+    	
+    	# Now $t3 have the index where the word is suppose to go
+    	# to get the word offset we multiply $t3 by 4
+    	# We load 4 into $t4
+    	li $t4, 4
+    	
+	# We multiply the index with 4 this gets our word offsets which we add
+	# with $a0 to get our effective address
+    	mul $t3, $t3, $t4
+    	
+    	# We add $t3 with $a0 to get our effective address to increment the lowercase letter
+    	add $t3, $t3, $a0
+    	
+    	# Now we have to get the values from the array first, add it, then put it back in
+    	# We will get the value from array and put it into $t4. We use $t3 as our effective address
+    	lw $t4, 0($t3)
+    	
+    	# We increment the value in $t4
+    	addi $t4, $t4, 1
+    	
+    	# Then we store the value back in the same effective address $t3
+    	sw $t4, 0($t3)
+    	
+    	# Now we are done, we increment the lowercase's count in the array
+    	# We can move onto the next character in message to work with
+    	# We just have to increment $a1 and $s0 lowercase letter counter
+    	addi $a1, $a1, 1
+    	
+    	addi $s0, $s0, 1
+    	
+    	# After incrementing we jump to the next iteration
+    	j for_loop_to_count_lowercase
+    	
+    	skip_to_next_letter_to_count:
+	# If we are here then that means we just have to increment the message address
+	# to get our next character we don't increment the lowercase letter counter
+	addi $a1, $a1, 1
+	
+	# Then we jump back up the loop
+	j for_loop_to_count_lowercase
+    
+    finished_counting_lowercase_loop:
+    # If we are here then we are essentially done with counting
+    # All we have to do is move $s0 into $v0 and return that's it
+    move $v0, $s0
+    
+    # Then we return and done
     jr $ra
 
 sort_alphabet_by_count:
