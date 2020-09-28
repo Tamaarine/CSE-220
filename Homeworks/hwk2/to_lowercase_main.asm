@@ -1,6 +1,6 @@
 .data
 
-str20: .ascii "BCDEFGHIJKLMNOPQRSTUVWXYZ\0" # Givese 25
+str20: .ascii "Stony BrooOOOOOKk\0" # Givese 25
 	
 .text
 .globl main

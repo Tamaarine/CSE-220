@@ -189,7 +189,7 @@ to_lowercase:
     	# Now because the lower case letter is stored in $t1 we can add 32 to it to get the lower cased letter
     	addi $t1, $t1, 32 # Adding 32 to get the lower cased letter
     	
-    	# Now we have to put this byte to where it belongs through sw as replacement
+    	# Now we have to put this byte to where it belongs through sb as replacement
     	sb $t1, 0($a0) # We can just put $t1 at 0($a0) because $a0 is the one moving
     
     	# This label is for non-upper case letters to be skipped
@@ -755,10 +755,278 @@ count_lowercase_letters:
     # All we have to do is move $s0 into $v0 and return that's it
     move $v0, $s0
     
-    # Then we return and done
+    # Then we return and done, heck I just did selection sort in MIPS that is freaking crazy
     jr $ra
 
 sort_alphabet_by_count:
+    # For this problem we are going to use a selection sort to sort the counts of the alphabets
+    # We are going to use the run time stack to keep track of an array of letter that correspond to
+    # with the count of the letter. This way we will know which count is for which and when we 
+    # Swap in count we also swap in the run time stack. It will be just 26 byte because 
+    # Each character can be contained in a byte there isn't a need to do an entire word which adds more trouble
+    
+    # $a0 -> have the starting address of where we are putting the sorted_alphabet, it is at least
+    # 27 bytes in size and is uninitilized, we don't have to clean it because we are going to overwrite it
+    # with the letters anyway after we sort, but we do have to put a null terminator at index 26
+    # $a1 -> have the starting address of the counts array which is 26 words that contains the count
+    # for each letter. This is the array we are looping over to sort our array
+    # Output -> None, this is a void method so we don't have to return anything
+    
+    # Now before we proceed with the selection sort we have to make another array of 26 byte 
+    # That correspond to each of the counts in counts array
+    # So let's make 26 byte by subtracting 26 from the $sp register
+    addi $sp, $sp, -26 # Allocating 26 byte in the run time stack
+    
+    # Now we put the first lowercase letter a in $t0
+    # and the last lowercase letter z in $t1
+    li $t0, 'a'
+    li $t1, 'z'
+    
+    # The register $t2 will be holding byte index and will be the
+    # one that is incremented along with $t0 to help us store the letter in the corresponding position
+    # in the run time stack array. It will be the same value as $sp
+    move $t2, $sp
+    
+    # Now we will go through iteration from a to z
+    for_loop_for_placing_letters:
+    	# We set our stopping condition when $t0 is greater than z
+    	bgt $t0, $t1, finished_loop_placing_letters
+    
+    	# If we are here then we have to put $t0 in the $t2 position of the array
+    	sb $t0, 0($t2)
+    	
+    	# Then we increment $t0 to get the next letter
+    	addi $t0, $t0, 1
+    	
+    	# And increment the position counter
+    	addi $t2, $t2, 1
+    	
+    	# Then jump back up the loop
+    	j for_loop_for_placing_letters
+    
+    finished_loop_placing_letters:
+    # If we are out here then we are done placing the letters a to z in the run time stack array
+    
+    # We should only keep track fo the index only , effective address can be calculated later
+    # This is our outer loop and we will be keeping track of the outer loop counter in $t0 starting with 0
+    # And the inner loop counter will be in register $t1, the end goal which is 26 will be in register $t2
+    li $t0, 0
+    li $t2, 26
+    
+    # This is our outer loop for selection sort, remember $t0 is the loop counter for the outer loop
+    for_loop_selection_sort_outer:
+    	# This is our stopping condition once $t0 hits 26 then everything in the array
+    	# is sorted there is no need to continue on
+    	bge $t0, $t2, finished_selection_sort
+    	
+    	# If we are here then that means we have to find the maximum element through
+    	# the inner loop, we will be keeping track of the largest element index in $t3
+    	# We assume $t0 is the largest element index in the beginning until proven
+    	move $t3, $t0 # Assume i is the largest element index until proven
+    	
+	# $t1 is the counter for the inner loop and it will have the vallue of $t0 plus 1
+	move $t1, $t0
+	addi $t1, $t1, 1 # We add one for i + 1 as the inner loop counter
+	
+	# Then this is our inner loop, remember $t1 is the inner loop counter
+	for_loop_selection_sort_inner:
+	    # Here we have to compare every element from i + 1 and on against the element we have
+	    # at $t3 and after the inner loop we will have the largest element to swap with at $t3
+   	    # But before we do anything we have to check the inner loop condition, it is the same
+   	    # condition with the outer loop except we compare it using $t1
+   	    bge $t1, $t2, finished_inner_loop_selection_sort	 
+   	    
+   	    # Now if we are able to reach here then we have to compare the element at $t3
+   	    # against the element at $t1. Element in $a1 are words so we the way we have to get the element
+   	    # is to multiply the index by 4 and add it to the base address
+	    # In register $t4 we will store the address offset of maxIndexElement, while in $t5 we will
+	    # Store the offset of the element we are comparing. In $t7 we will store 4
+	    li $t7, 4
+	    
+	    # Now multiply $t3 by $t7 and store in $t4
+	    mul $t4, $t3, $t7
+	    
+	    # Then we multiply $t1 the inner loop counter by 4 and store in $t5
+	    mul $t5, $t1, $t7
+	    
+	    # Now to get our effective address of the element we add $t4 and $t5 with $a1
+	    add $t4, $t4, $a1
+	    add $t5, $t5, $a1
+	    
+	    # Then we will load in each element in $t6 and $t7 for the maxIndexElement and the current
+	    # element we are comparing in j
+	    lw $t6, 0($t4) # $t6 have our maxIndexElement
+	    lw $t7, 0($t5) # $t7 have our element that we are comparing maxIndexElement with
+	    
+	    # Now because of the special case that if the counts are equal
+	    # We have to take the letter that has a smaller ascii value 
+	    # We must do more work to check to ascii values too
+	    beq $t6, $t7, check_ascii_values_too_before_replace
+	    
+	    # If we are here then that means that the two elements are definitely not equal so there is no 
+	    # conflicts, we just have to take the one that is bigger after comparsion
+	    # If our maxIndexElement is bigger than or greater than the element we are comparing
+	    # Then we don't replace max_index_element because it is already the biggest
+	    # And we only take the first largest not the last
+	    bge $t6, $t7, skip_replace_max_index_element
+	    
+	    # If we are here then that means we are replaing max_index_element
+	    # with the one we have currently in the inner loop which is $t1
+	    move $t3, $t1
+	    
+	    # After we updated the maxIndexElement we have to increment
+	    # the inner loop counter $t1 so we jump to skip_replace_max_index_element
+	    j skip_replace_max_index_element
+	    
+	    check_ascii_values_too_before_replace:
+	    # If we are here then that means the two values we are comparing
+	    # Have the same exact counts, hence we need to check their ascii
+	    # values to further determine which one we replace $t3 with
+	    # The only important registers here is
+	    # $t0, which is our current element that we have this is also our outer loop counter
+	    # $t1, which is the current element we are comparing $t3, the maxIndexElement 
+	    # $t2, is our stop condition, we must not change it
+	    # Then all the register from $t4 and on can be used but we will use $s registers to distingusish
+	    # Between comparing the ascii value from the counts value
+	    
+	    # Now because the counts are organized by bytes not words, we don't have to multiply by 4
+	    # in order to access each index element
+	    # We just have to add $t1 with $sp and $t3 with $sp
+	    add $s0, $t3, $sp # This is the maxIndexElement's letter address
+	    add $s1, $t1, $sp # This is the element we are comparing to maxIndexElement's letter's address
+	    
+	    # Now we get the actual ascii value
+	    lbu $s2, 0($s0) # This is the maxIndexElement's letter
+	    lbu $s3, 0($s1) # This is the element we are comapring to maxIndexElement's letter
+	    
+	    # Now we only take the one that is lower ascii value, not the bigger one
+	    # So if the ascii value of $s0 is greater than $s1's ascii value
+	    # Like if e is the maxIndexElement compared to a, we take a not e so
+	    # update the maxIndexElement ($t3) to $t1, else if $s0's ascii is less than $s1 we skip
+	    
+	    # This means that the letter we have is already the smaller ascii value so we skip
+	    blt $s2, $s3, skip_replace_max_index_element 
+	    
+	    # Else if $s1 is the smaller ascii value we place $t3 with $t1
+	    move $t3, $t1
+	     
+	    # Then logically we move onto the next count to check
+	    
+	    skip_replace_max_index_element:
+   	    # Here we just have to increment $t1 the inner loop counter
+   	    addi $t1, $t1, 1
+   	    
+   	    # And jump back up the inner loop
+   	    j for_loop_selection_sort_inner
+   	    	
+    	# If we are here then $t3 have the largest element index to swap with $t0's element
+    	# We swap here
+    	finished_inner_loop_selection_sort:
+	# Let's restate the registers that are important again
+	# $a0 is where we are putting the sorted letters
+	# $a1 is the counters array that have the counts for each letter
+	# $t3 is the register that have the index of the largest element to swap with element in $t0
+	# $t0 the outer loop counter which is also the element index that we are swapping with element in $t3
+	# $t2 is our 26 which is our stopping condition make sure we don't mess with that
+	# then rest of the registers are free for us to use
+	
+	# Now again we have to get our effective address in order to do the swapping
+	# Load 4 into $t7
+	li $t7, 4
+	
+	# We multiply $t3 by $t7 and store in $t4 this is offset for the maxIndexElemenet we store in $t4
+	mul $t4, $t3, $t7
+	
+	# We multiply $t0 by $t7 and store it in $t5 this is the offset for the current element we have to
+	# swap with maxIndexElement and we store in $t5
+	mul $t5, $t0, $t7
+	
+	# Now to get our effective address of the element we add $t4 and $t5 with $a1
+	add $t4, $t4, $a1 # The max element
+	add $t5, $t5, $a1 # The current element we have to swap with
+	
+	# Then we load in the actual value of each element
+	lw $t6, 0($t4) # $t6 is our max element
+	lw $t7, 0($t5) # $t7 is the current element we have to swap with
+	
+	# Then we just have to swap with the address
+	sw $t6, 0($t5) # We put the current element into where the max element is
+	sw $t7, 0($t4) # Then we put the max element to where the current element is
+	
+	# Now that only did the counter element, we have to do it in the run time stack array
+	# to mirror the effect all we have to do is to change $a1 to $sp
+	# Because the array is byte sized, we don't have to multiply by 4
+	
+	# Remember we are swapping the letters in the run time stack so to get our
+	# effective address we have to add the offset indext with the stack pointer register
+	add $t4, $t3, $sp # The max element
+	add $t5, $t0, $sp # The current element we have to swap with
+	
+	# Then everything else is the same as the previous one
+	lbu $t6, 0($t4) # $t6 is our max element
+	lbu $t7, 0($t5) # $t7 is the current element we have to swap with
+	
+	# Then we just have to swap with the address
+	sb $t6, 0($t5) # We put the current element into where the max element is
+	sb $t7, 0($t4) # Then we put the max element to where the current element is
+	
+	# We swapped in the counter, we swapped in the run time stack
+	# We can proceed to the next letter
+	
+	# Swap is complete we can increment $t0 to work on the next element
+	addi $t0, $t0, 1
+	
+	# Then we jump back up to the outer loop
+	j for_loop_selection_sort_outer
+	
+    finished_selection_sort:
+    # After finishing the selection sort, the counts array is sorted, the run time stack is sorted
+    # based on ascii values and the counts. Then all we have to do is just replace everything in 
+    # a0 with the letters in the run time stack then we are done!
+    # We will again be keeping track of the index of this loop in $t0 starting at 0
+    li $t0, 0
+    
+    # We know this loop will run 26 times so our stopping condition is at 26
+    li $t1, 26
+    
+    # Now before we do anything, because the string sorted_alphabet is 27 byte in size it must be null
+    # terminated at index 26. Let's just do that right now and get it out of the way first
+    sb $0, 26($a0) # Putting a null terminator at the end of the String
+    
+    # Then we can go through a for loop to copy the ordering of the letters in the run time stack
+    # to the String
+    for_loop_for_extracting_from_rts:
+    	# Obviously we have to do the stopping condition first
+    	bge $t0, $t1, finished_the_sort_alphabet_by_count_function
+    	
+    	# Of course we have to grab the effective address from the run time stack
+    	# and the string first
+    	# We will store it in $t2 the effective address of run time stack
+    	add $t2, $t0, $sp 
+    	
+    	# We will store in it $t3 the effective address of the String
+    	add $t3, $t0, $a0
+    	
+    	# Then we load the letter from $t2 into $t4
+    	lbu $t4, 0($t2)
+    	
+    	# Then just have to store it in the effective address of the String $t3
+    	sb $t4, 0($t3)
+    	
+    	# Increment the loop counter
+    	addi $t0, $t0, 1
+    	
+    	# Jump back up
+    	j for_loop_for_extracting_from_rts
+    
+    finished_the_sort_alphabet_by_count_function:
+    # If we are here then we have extracting the letters from the run time stack and moved to
+    # the String we need to move it to
+    # Please don't forget to deallocate the 26 byte run time stack
+    # All we have to do is to add 26 back to $sp
+    addi $sp, $sp, 26 # Done
+    
+    # Jump back up to the main	
     jr $ra
 
 generate_plaintext_alphabet:
