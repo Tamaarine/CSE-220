@@ -36,7 +36,7 @@ str30: .ascii "BCDEFGHIJKLMNOPQRSTUVWXYZ\0" # Givese 25
 .text
 .globl main
 main:
-	la $a0, str30
+	la $a0, str14
 	jal strlen
 	
 	# You must write your own code here to check the correctness of the function implementation.

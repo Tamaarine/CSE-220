@@ -47,34 +47,42 @@ strlen:
     jr $ra
 
 index_of:
-    # If we here then we are going oto implement a function that returns the index of the first
+    # If we here then we are going to implement a function that returns the index of the first
     # Instance of a wanted character in a null-terminated String. We will start searching at
     # The given index and continue onward until we hit the end of the String or invalid index in the beginning
+    
+    # Preamable
+    # Now because we are going to call on the function strlen which takes in 
+    # $a0 as argument we still need to save it because we don't know if 
+    # $a0 will be modified or not so we have to save it into a $s register
+    # Now since we are overwritting a $s register we have to follow convention and save it on the
+    # runtime stack before we can use it
+    # Then we also allocate 4 more byte to save $ra because we will be calling strlen function
+    # Just do it here it will be much easier than later on scattered everywhere
+    addi $sp, $sp, -8 # We allocate 8 byte of memeory to store $s0 and $ra
+    
+    # We put $s0 on the stack then we are able to use $s0 now
+    sw $s0, 0($sp) 
+    
+    # Then we put $ra on the stack position 4, now we are able to call the function
+    sw $ra, 4($sp) 
     
     # $a0 -> is the starting address of the String we are looking through
     # $a1 -> is the character we are looking for in the String, is guaranteeded to be printable
     # $a2 -> is the start_index, the index where we begin our search
     # Output -> returning in $v0 the index where the character is found starting from start_index
     
-    # Let's first obtain the length of our String using the strlen method we wrote
-    # in the previous part. We have to save our $ra or else index_of won't know where to return
-    # Allocate 4 byte of memory in our stack first, by subtracting 4
-    addi $sp, $sp, -4 # Giving us 4 byte address to store $ra
-    
-    sw $ra, 0($sp) # Save the return address of index_of on the stack
-    
-    # Because we have $a0 already then we can call strlen to get the length of the String
-    # in $v0, but keep in mind that strlen modifies $a0 so we have to restore it by subtracting with length
-    # after it comes back
+    # Now before we can call strlen we have to save $a0 onto $s0 because it might modifify it
+    move $s0, $a0  
      
+     # Then we can safely call strlen because we have saved $ra already
     jal strlen # Call the strlen function that returns the length of the given String in $v0
     
     # Let's store the return value of the String length in $t0
     move $t0, $v0 # Store the length into $t0
     
-    # Before we move on we have to subtract $a0's address by the length to back to the beginning
-    # of the word again because we are looping through to check the index of a character, after getting length
-    sub $a0, $a0, $t0
+    # Before we move on we have to restore $a0 by moving from $s0 
+    move $a0, $s0
     
     # Now before we proceed to loop it through, we must check $a2 or the start index is valid
     # or else we just return -1
@@ -138,11 +146,15 @@ index_of:
     # Then we just return back the value to the caller 	
     
     finished_index_of_method:
-    # We have to restore $ra here before we jump back else index_of will stuck here forever
-    lw $ra, 0($sp) # Loading back the return address of index_of from the stack
+    # Postamable
+    # We have to register the $s register we have used from the runtime stack
+    lw $s0, 0($sp)
+    
+    # We also have to restore $ra here before we jump back else index_of will stuck here forever
+    lw $ra, 4($sp)
     
     # Don't forget to deallocate the memory after!
-    addi $sp, $sp, 4 # Adding 4 to deallocate what we allocated
+    addi $sp, $sp, 8 # Adding 8 to deallocate what we allocated
     
     # Jump back to the main with the index in $v0
     jr $ra
@@ -227,9 +239,16 @@ generate_ciphertext_alphabet:
     # So initially everything is 0 then we will just have to loop through the keyphase to pick out
     # Which one exist and which one doesn't
     
-    # Let's first allocate 64 byte of array, we want the pointer to be word aligned
-    # We will have 2 extra byte, we have to deal with it
-    addi $sp, $sp, -64
+    # Preamable for all the s registers that we have used!
+    # Because we have used $s0 we must preserve that on the runtimestack and restore it later
+    # Along with the stack array that we will allocate, together it will be total of 68 byte
+    # The last 4 byte on position 64 - 67 will be used to store $s0
+    # Everything from 0 - 63 inclusive will be used to store the runtime stack array
+    # I know we will have 2 byte of extra memory for the array but we have to deal with it
+    addi $sp, $sp, -68 # Allocating total of 68 byte of memory or 17 words
+    
+    # The last word will be used to store $s0 because we are using it
+    sw $s0, 64($sp) # Storing the $s0 register at the last word at our allocated memory
     
     # Now because we can't assume the memory is 0 in the beginning we have to make them all 0
     # It is from 0 to 61 immediates to add to $sp to get the effective address
@@ -625,12 +644,17 @@ generate_ciphertext_alphabet:
     # Finally if we here then everything is added in we just have to move $s0 into $v0 and return
     move $v0, $s0
     
-    # Don't forget to deallocate the 64 byte that we have used
-    addi $sp, $sp, 64
+    # Then don't forget to have to restore $s0 from the runtime stack array
+    # at position 64 wordd 17
+    lw $s0, 64($sp) # Restoring the $s0 register from our stack
+    
+    # Then we have to deallocate the entire 68 byte of memory we used
+    addi $sp, $sp, 68
     
     # Holy hell that is such a big improvement in efficency after i used an array
     # damn that is impressive from my 100,000 instruction run from the first time i wrote this
     
+    # Jump back to main
     jr $ra
 
 count_lowercase_letters:
@@ -645,6 +669,17 @@ count_lowercase_letters:
     # letter to count the lowercase from
     # Output -> $v0, we are going to return the total count of lowercase letters in messages
     
+    # Preamable for the $s registers we have used
+    # Throughout this function we have used $s0 so we must preserve it on the
+    # runtime stack before we can unlock it and use it
+    # Let's allocate 4 byte of memory to store that $s0 on a word
+    addi $sp, $sp, -4 # Allocating 4 byte for the $s0 register
+    
+    # Then we just have to simply store it on the stack
+    sw $s0, 0($sp)
+    
+    # Now we can use the $s0 register because we have saved it on the stack
+       
     # Since we have 26 letters we will go up the byte index until 104 stopping before hitting 104 at 100
     # indexing we will be using $t0 to keep track of the index we are at, and $t1 as
     # the byte length for stopping condition. 0 to 100 is 26 byte
@@ -755,6 +790,13 @@ count_lowercase_letters:
     # All we have to do is move $s0 into $v0 and return that's it
     move $v0, $s0
     
+    # Now before we return we have to restore the $s0 register we have used
+    # from the runtime stack
+    lw $s0, 0($sp)
+    
+    # Then we deallocate the 4 byte of memory we have used by adding 4
+    addi $sp, $sp, 4
+    
     # Then we return and done, heck I just did selection sort in MIPS that is freaking crazy
     jr $ra
 
@@ -772,10 +814,35 @@ sort_alphabet_by_count:
     # for each letter. This is the array we are looping over to sort our array
     # Output -> None, this is a void method so we don't have to return anything
     
-    # Now before we proceed with the selection sort we have to make another array of 26 byte 
-    # That correspond to each of the counts in counts array
-    # So let's make 26 byte by subtracting 26 from the $sp register
-    addi $sp, $sp, -26 # Allocating 26 byte in the run time stack
+    # Preamable
+    # Now because in the function we are going to be using 
+    # $s0, $s1, $s2, $s3 registers we have to save those 4 registers
+    # onto the stack. 4 registers each of 4 byte which makes it 16 byte in total
+    # Now we also will be allocating 26 byte of stack array in our runtime stack
+    # To help us to do the sorting, We have to make it word aligned so
+    # 26 needs to be round up to 28, 28 + 16 = 44 byte of memory which makes it
+    # total of 11 words
+    # Let's allocate that
+    addi $sp, $sp, -44
+    
+    # Now keep in mind memory index 0 to 27 will be used by the stack array
+    # I know we will have 2 extra byte of memory but we have to deal with it
+    
+    # Memory index 28 to 43 will be used to restore the 4 registers, let's do that right now
+    sw $s0, 28($sp) # The first word stores $s0
+    sw $s1, 32($sp) # Second word stores $s1
+    sw $s2, 36($sp) # Third word stores $s2
+    sw $s3, 40($sp) # Fourth word stores $s3
+    
+    # Now we have unlocked the 4 registers for us to use
+    # Let's do some testing to make sure 2 byte of memory is not used
+    li $t0, 'P'
+    li $t1, 'E'
+    
+    sb $t0, 26($sp)
+    sb $t1, 27($sp)
+    
+    # Then rest is for the runtime stack array
     
     # Now we put the first lowercase letter a in $t0
     # and the last lowercase letter z in $t1
@@ -1022,14 +1089,23 @@ sort_alphabet_by_count:
     finished_the_sort_alphabet_by_count_function:
     # If we are here then we have extracting the letters from the run time stack and moved to
     # the String we need to move it to
-    # Please don't forget to deallocate the 26 byte run time stack
-    # All we have to do is to add 26 back to $sp
-    addi $sp, $sp, 26 # Done
+    
+    # Now we have to restore what was in those 4 $s registers from the runtime stack
+    lw $s0, 28($sp) # The first word stores $s0
+    lw $s1, 32($sp) # Second word stores $s1
+    lw $s2, 36($sp) # Third word stores $s2
+    lw $s3, 40($sp) # Fourth word stores $s3
+    
+    # Then we have to deallocate the 44 byte of memory we have allocated
+    addi $sp, $sp, 44
     
     # Jump back up to the main	
     jr $ra
 
 generate_plaintext_alphabet:
+    
+
+
     jr $ra
 
 encrypt_letter:

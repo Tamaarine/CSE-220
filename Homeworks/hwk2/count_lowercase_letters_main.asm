@@ -7,8 +7,16 @@ message3: .asciiz "iusov, as a man man of breeding and deilcacy, could not but f
 .text
 .globl main
 main:
+	li $s0, 69
+	li $s1, 69
+	li $s2, 69
+	li $s3, 69
+	li $s4, 69
+	li $s5, 69
+	li $s6, 69
+	li $s7, 69
 	la $a0, counts
-	la $a1, message3
+	la $a1, message2
 	jal count_lowercase_letters
 
 	# You must write your own code here to check the correctness of the function implementation.

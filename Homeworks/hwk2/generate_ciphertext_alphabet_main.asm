@@ -59,20 +59,31 @@ keyphrase13: .asciiz ""
 # Answer: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 keyphrase14: .asciiz "   - - - -          "
 
-# Tested
-keyphrase15: .asciiz "Stony? ?Brook? ?University"
+# Tested "StonyBrkUivesabcdfghjlmpquwxzACDEFGHIJKLMNOPQRTVWXYZ0123456789"
+keyphrase15: .asciiz "Stony? ?Brook? ?University" # return 13
 
-# Tested
-keyphrase16: .asciiz "Monday,? ?September? ?21st,? ?2020? ?4:39? ?PM? ?EDT"
+# Tested "MondaySeptmbr21s0439PEDTcfghijklquvwxzABCFGHIJKLNOQRUVWXYZ5678"
+keyphrase16: .asciiz "Monday, September 21st, 2020 4:39 PM EDT"
 
-# Tested
+# Tested "suPeRcalIfrAgiLtCxdoObhjkmnpqvwyzBDEFGHJKMNQSTUVWXYZ0123456789"
 keyphrase17: .asciiz "suPeRcalIfrAgiListICexPiaLIdoCIOus"
+
+keyphrase18: .asciiz "adfsdifgrqerjUBRFBOhiyhdouwjqoemvxmcjvbzx,DSNFOSDNF[][][\[QWE[]QWE]QQWEHIHS"
 
 .text
 .globl main
 main:
+	# Say we used $s0 here
+	li $s0, 69
+	li $s1, 69
+	li $s2, 69
+	li $s3, 69
+	li $s4, 69
+	li $s5, 69
+	li $s6, 69
+	li $s7, 69
 	la $a0, ciphertext_alphabet
-	la $a1, keyphrase17
+	la $a1, keyphrase15
 	
 	jal generate_ciphertext_alphabet
 	

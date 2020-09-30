@@ -1,7 +1,7 @@
 .data
-str: .asciiz "!MissMissySimpySimpyMMSi!!!!"
-ch: .byte '!'
-start_index: .word 28
+str: .asciiz "I want to die KILL ME"
+ch: .byte 'E'
+start_index: .word 22
 
 .text
 .globl main
