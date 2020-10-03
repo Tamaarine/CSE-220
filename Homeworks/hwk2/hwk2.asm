@@ -1103,9 +1103,212 @@ sort_alphabet_by_count:
     jr $ra
 
 generate_plaintext_alphabet:
+    # If we are here then that means we have to generate a plaintext based on 
+    # the given sorted alphabet. The most frequent one repeat which is the first
+    # letter in the sorted alphabet string will repeat 8 times, total of 9 time in the
+    # plaintext alphabet. The second frequent one repeats 7 times, total of 8 times in the plaintext alphabet
+    # so on and so forth
     
-
-
+    # $a0 -> contains the address where we are suppose to writte the plaintext_alphabet
+    # it is unitialized and is at least 63 byte in size, it must be null terminated at the [62] position
+    # or at the last byte or the String
+    # $a1 -> contains the string for the sorted_alphabet this is where the sorted alphabet is placed
+    # we will be looping through this String for 8 times to find the 8 most frequent letters
+    # that needs to be repeated
+    # Output -> No return value because this method is void
+    
+    # So our game plan is we will allocate a 26 byte sized array in the run time stack
+    # Each index will be mapped to a-z letter respectively by adding or subtracting 97 to the ascii
+    # to get the index value. The actual byte content will contain the number of times that we have
+    # to repeat the letter. All of the elements will be initially 1 first so let's first allocate it
+    # then we will store 1s in all of them
+    addi $sp, $sp, -26 # Allocating 26 byte of memory in the run time stack for an array
+    
+    # Let's store the loop counter at $t0
+    li $t0, 0
+    
+    # We store our stopping condition at $t1 which is 25 because we will go
+    # through it 25 times 
+    li $t1, 25
+    
+    # Then we store 1 into $t2 because that is the value we are putting inside each byte
+    li $t2, 1
+    
+    # Now we will have to put the value of 1 them from index 0 to 25
+    for_loop_to_put_one_in_elements:
+    	# Let's do our stopping condition first, it will stop as soon as it hit 26
+    	# which means it will go through 0 - 25
+    	bgt $t0, $t1, finished_loop_to_put_one_in_elements
+    	
+    	# Now if we are here then we have to get our effective address first
+    	# before we can store $t2 into each byte
+    	# We get our effective address of each element by adding $t0 to the stack pointer
+    	# let's store it into $t3 
+    	add $t3, $t0, $sp # Getting our effective address for each element
+    	
+    	# Then we just have to store $t2 into $t3's address
+    	sb $t2, 0($t3)
+    	
+    	# Then we increment our counter
+    	addi $t0, $t0, 1
+    	
+    	# And jump back up the loop
+    	j for_loop_to_put_one_in_elements
+    	
+    finished_loop_to_put_one_in_elements:
+    # Now if we are here then that means there is 26 1's in each elements of the array
+    # The next step is to loop through the sorted array 8 times only to grab the first 8
+    # characters that needs to be repeated
+    # So let's establish our counters
+    li $t0, 0 # This is our loop counter
+    
+    # We have to go through it 8 times so $t1 have 8 which is our stopping condition
+    li $t1, 8
+    
+    # Then we have to have a register to keep track of the amount that we repeat
+    # it starts at 8 and decrements until 0 but not used we put that in $t2
+    li $t2, 8 # $t2 is our repeat counter to tell us how many times to add in addition to only 1 in the stack array
+    
+    # This loop will go through sorted_arrays total of 8 times to add
+    # the number of repetition that is needed for the first 8 letters in the sorted array
+    for_loop_to_add_repetition:
+    	# Let's do our stopping condition here first
+    	# If our counter is greater than or equal to 8 then we are done
+    	# going through 0 - 7 index of the string, which is total of 8 letters
+    	bge $t0, $t1, finished_loop_to_add_repetition
+    	
+    	# Now if we are here then we first let's just get our ascii value of the string
+    	# at this index. To do that we add $t0 with $a1 to get our effective address
+    	# for the element and let's store it in $t3
+    	add $t3, $t0, $a1
+    	
+    	# Then $t3 contain our effective address for that character
+    	# we just load it in into the same register because we don't need that address again
+    	lbu $t3, 0($t3)
+    	
+    	# Now we know that the letter in $t3 need to be repeated $t2 times
+    	# so we have to add $t2 to the element repeat counter in our stack array
+    	# that represents the letter $t3
+    	# To do that we have to get our offsets for the stack array
+    	# Which can be accomplished by subtracting 97 to $t3 which get us our index
+    	# for the stack array
+    	# Let's load in 97 in $t4
+    	li $t4, 97
+    	
+    	# Then we will subtract $t3 with $t4 and store it back in $t3
+    	sub $t3, $t3, $t4
+    	
+    	# Now we have our offset of the index in the runtime stack in $t3
+    	# We just have to add it with $sp to get our real address for the
+    	# byte that we are suppose to increment by $t2
+    	add $t3, $t3, $sp
+    	
+    	# Then we get the value that is inside of that byte first store it in $t4
+    	lbu $t4, 0($t3)
+    	
+    	# We add $t2 to $t4
+    	add $t4, $t2, $t4
+    	
+    	# Then we put it back in $t3
+    	sb $t4, 0($t3)
+    	
+    	# Now we have to increment our counters 
+    	addi $t0, $t0, 1
+    	
+    	# And subtract our repetition counter by 1
+    	addi $t2, $t2, -1
+    	
+    	# And jump back up the loop
+    	j for_loop_to_add_repetition
+    	
+    finished_loop_to_add_repetition:
+    # If we are here then that means our runtime stack contains the number of times we are suppose
+    # append each letter into plaintext_alphabet
+    # Now we have to loop through our runtime stack array and append as many times
+    # of the ascii value that is associated with that index onto $a0
+    # It will be a nested for loop
+    
+    # First because at the 62 position of $a0 in the plaintext_alphabet it must be null terminated
+    # Let's just do that right here to get it out of the way
+    sb $0, 62($a0) # Storing a null terminator at the [62] position of the plaintext_alphabet
+    
+    # Let's set up our counters for the nested for loops first
+    li $t0, 0 # This is our counter for the outer for loop
+    
+    # We will put our stopping condition 26 into $t2 because there is 26
+    # element in the runtime stack array, so the outer loop need to traverse from 0 to 25
+    li $t2, 26
+    
+    for_loop_appending_repetition_letters_outer:
+    	# This is our outer loop let's do the stopping condition first
+    	# This will allow us to go from 0 to 25 inclsuive that represent the runtime stack array index
+    	bge $t0, $t2, finished_append_repetition_letters_outer
+    	
+    	# So before going into the inner loop we have to get the number that is in the
+    	# runtime stack array which represents the stopping condition for our inner loop
+    	# We have to get the effective address first, then we add $t0 with $sp and store it into $t3
+    	add $t3, $t0, $sp
+    	
+    	# $t3 have our effective address of the repetition element
+    	# Let's load it and store it in $t3
+    	lbu $t3, 0($t3)
+    	
+    	# Now $t3 is our stopping condition, if it is 1 then we only append 1 time 0
+    	# if it is 3 then we append 3 times, 0 to 2
+    	# if it is 9 then we append 9 times, 0 to 8
+    	# so on and so forth
+    	# We will put the inner loop counter in $t1 and initialize it 0
+    	li $t1, 0
+    	
+    	# Now before we go in let's get the letter that we are suppose to be appending
+    	# This can be done through adding 97 to outer loop index
+    	# Let's store it in $t4 97 first then we will add $t0 into it
+    	li $t4, 97
+    	
+    	# Then we add $t4 with $t0 which gives us the letter that we have to append in the inner loop
+    	add $t4, $t4, $t0
+	    	
+    	for_loop_appending_repetition_letters_inner:
+    		# Then we can go into the inner for loop
+    		# Let's knock our stopping condition out of the way first
+    		# Our counter starts at 0, stopping condition can be 1...9 representing
+    		# How many times we need to iterate
+    		# Once the counter hits $t3 then we stop because we already appended enough times
+    		bge $t1, $t3, finished_appending_repetition_letters_inner
+    		
+    		# Now if we are here we store $t4 in $a0
+    		sb $t4, 0($a0)
+    		
+    		# After we finish storing it we must increment $a0 to move onto the next
+    		# location to put our alphabet
+    		addi $a0, $a0, 1
+    		
+    		# Then after we add to plaintext_alphabet we have to increment our inner loop counter
+    		addi $t1, $t1, 1
+    		
+    		# Then we just have to jump back up to the inner loop
+    		j for_loop_appending_repetition_letters_inner
+    	
+    	finished_appending_repetition_letters_inner:
+    	# Now if we are here then that means we are finished appending that specific letter
+    	# number of times according to the runtime stack array
+    	# Then we have to increment our outer loop counter
+    	addi $t0, $t0, 1
+    	
+    	# Then jump back up to the outer loop
+    	j for_loop_appending_repetition_letters_outer
+    	
+    finished_append_repetition_letters_outer:
+    # Then if we are here then it is essentially done, we are done with the problem!
+    # Let's double check just in case
+    addi $a0, $a0, -62
+    li $v0, 4
+    syscall
+    
+    # Don't forget to deallocate the 26 byte of space we have used in the runtime stack
+    addi $sp, $sp, 26 # Deallocating the 26 byte
+    
+    # Then we can return to main everything gucci
     jr $ra
 
 encrypt_letter:

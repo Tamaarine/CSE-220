@@ -83,7 +83,7 @@ main:
 	li $s6, 69
 	li $s7, 69
 	la $a0, ciphertext_alphabet
-	la $a1, keyphrase15
+	la $a1, keyphrase
 	
 	jal generate_ciphertext_alphabet
 	
