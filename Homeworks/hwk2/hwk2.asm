@@ -1300,10 +1300,6 @@ generate_plaintext_alphabet:
     	
     finished_append_repetition_letters_outer:
     # Then if we are here then it is essentially done, we are done with the problem!
-    # Let's double check just in case
-    addi $a0, $a0, -62
-    li $v0, 4
-    syscall
     
     # Don't forget to deallocate the 26 byte of space we have used in the runtime stack
     addi $sp, $sp, 26 # Deallocating the 26 byte
@@ -1312,9 +1308,427 @@ generate_plaintext_alphabet:
     jr $ra
 
 encrypt_letter:
+    # If we are here then that means we have to substitute the given plaintext letter
+    # along with its index value that it appeared in the plaintext message to one of the
+    # letter in the ciphertext, using the plaintext_alphabet
+    # We will only consider mapping if the given plaintext letter is a lowercase letter
+    # which have the ascii value from 97 to 122 inclusive. If we have to map the letter
+    # We have to find the length of the entire string that consist of that letter in the plaintext_alphabet
+    # and the start of that letter in the plaintext_alphabet before we can actually do the mapping
+    # to which of the ciphertext_alphabet
+    
+    # $a0 -> contains the plaintext_letter which is the one we are substituting
+    # we have to make sure that it is lowercase or else we return -1
+    # $a1 -> contains the letter_index which is where the plaintext_letter belongs in the plaintext message
+    # it is an non-negative integer. We will be using to do the modulous to determine which letter
+    # we map it into
+    # $a2 -> contains the plaintext alphabet, the 62 character String alphaet that we are using to encrypt
+    # this plain_text letter. It will tell us which letter from ciphertext we can use to substitue
+    # $a3 -> contains the ciphertext_alphabet, the 62 character String that have the letter for each plaintext
+    # letter to be mapped to. This is the String that we are using to get the actual
+    # encryped letter
+    # Output -> $v0, we return in $v0 the encryped letter or -1 if plaintext_letter is not lowercase!
+    
+    # So obviously we have to get the base case out which is when
+    # plaintext_letter is not a lowercase letter which is ascii value from 97 to 122 inclusive
+    # Let's load 97 and 122 into register $t0 and $t1 respectively
+    li $t0, 97 # Contain 'a'
+    li $t1, 122 # Contain 'z'
+    
+    # This means that the plaintext_letter's ascii value is less than 97
+    # Which means that it can never be a lowercase letter
+    blt $a0, $t0, is_not_lowercase_plaintext_letter
+    
+    # We branch if the plaintext_letter's ascii value is greater than 122
+    # Which means that it can never a lowercase letter
+    bgt $a0, $t1, is_not_lowercase_plaintext_letter
+    
+    # Now if we are here then the plaintext letter is actually a lowercase
+    # Which means that we have actual work to do for the encryption
+    # We must figure out the index of where the plaintext_letter starts and ends
+    # before we can figure out which letter it maps to in the ciphertext_alphabet
+    # Let's use a for loop to determine whether $a0 starts in the plaintext_alphabet
+    # $t0 will be our index answer containing the beginning of where plaintext_alphabet starts
+    li $t0, 0 # Our index counter
+     
+    # Now we have to load in the first letter in $a2 first before going into the while loop
+    # We will load it in $t1
+    lbu $t1, 0($a2)
+    
+    # Instead of incrementing $a2 we will make a copy of it in $t7 and increment that address
+    # instead so $a2 will stay in tact
+    move $t7, $a2
+    
+    # So we are going to do a while loop for finding the beginning idnex of the plaintext_letter
+    # We are guranteeded to find one because plaintext_alphabet contains all the lowercase
+    while_loop_to_find_plaintext_letter_start:
+    	# Let's do the stopping condition first, which is when
+    	# our current letter is equal to the plaintext_letter, then that means we have found
+    	# the starting index of that letter at $t0
+    	beq $t1, $a0, finished_find_plaintext_letter
+    	
+    	# But if we are here then that means $t1 isn't equal to the plaintext_text letter so we have to load
+    	# in the next plaintext_alphabet letter
+    	# So first we increment $t7 because that is our address pointer for $a2
+    	addi $t7, $t7, 1
+    	
+    	# Then we load in the byte that is at $t7 into $t1
+    	lbu $t1, 0($t7)
+    	
+    	# Then we also have incremnet our index counter
+    	addi $t0, $t0, 1
+    	
+    	# Then we jump back up the loop
+    	j while_loop_to_find_plaintext_letter_start
+    	
+    finished_find_plaintext_letter:
+    # If we are here then that means the previous for loop have
+    # found where the plaintext_alphabet starts in $t0
+    # Now we have to find where the index ends in order to figure out
+    # where the chain of plaintext_letter ends in order to get the length
+    # Which will be another for loop
+    # Our initial counter will be the value that is inside $t0 which we will put in
+    # $t1 as our end counter, we don't want to overwrite the precious start index we just found
+    move $t1, $t0
+    
+    # Now $t1 is where plaintext_letter begins we have to find where it ends so the end
+    # condition is whenever the letter we are at are not equal to the plaintext_letter
+    # We will be using another while_loop
+    while_loop_to_find_plaintext_letter_end:
+    	# Let's do our stopping condition first
+    	# We load in the letter we are currently at right now, to do that
+    	# we have to get the effective address which we can do by adding
+    	# $t1 with $a2 and let's store it in $t2
+    	add $t2, $t1, $a2
+    	
+    	# Then we load in the character into $t3
+    	lbu $t3, 0($t2)
+    	
+    	# Now we do our stopping condition here, if $t3 is not equal to the plaintext_letter then
+    	# We stop
+    	bne $t3, $a0, finished_find_plaintext_letter_end
+    	
+    	# But if we are here then we are going to check whether the next letter
+    	# is still a plaintext_letter
+    	# We will increment $t1 counter
+    	addi $t1, $t1, 1
+    	
+    	# Then we jump back up the loop
+    	j while_loop_to_find_plaintext_letter_end
+    	
+    finished_find_plaintext_letter_end:
+    # Now if we are here $t1 contains the first letter that is isn't our plaintext_letter
+    # So we get the actual last index of where plaintext_letter ends we have to subtract by 1
+    addi $t1, $t1, -1
+    
+    # Okay! We have $t0 which is where plaintext_letter starts in plaintext_alphabet
+    # We have $t1 which is where plaintext_letter ends in plaintext_alphabet
+    # We can get the length of the by subtracting $t1 - $t0 and adding 1, the length is important
+    # to figure out which ciphertext_alphabet we are mapping it to
+    sub $t2, $t1, $t0
+    
+    # Then we add 1 to $t2 to get the length
+    addi $t2, $t2, 1
+    
+    # Okay! We have where the letter begins, where it ends, and the length which is what k+1 is
+    # We just have to do some computation to figure out the index of the letter we have to return
+    # We will put that result index in $t3
+    # First we have to mod $a1 by the length to get letter_index mod (k+1)
+    # This can be done by div
+    div $a1, $t2 # letter_index mod (k+1)
+    
+    # We put the remainder in $t4
+    mfhi $t4
+    
+    # Then to get the index we are suppose to replace we add $t0 with $t4 and put it in $t3 as our
+    # result index of the ciphertext_alphabet
+    add $t3, $t0, $t4
+    
+    # Then we just have to actually get the letter and put it into $v0 and we are DONE!
+    # We get the effective adderss by adding $a3 with $t3
+    add $t3, $t3, $a3
+    
+    # Then we can put the byte that we load into $v0 directly
+    lbu $v0, 0($t3)
+    
+    # And we are done! We can jump to exit
+    j finished_encrypt_letter_exit
+     
+    # Make sure we jump here so we don't accidently overwrite the $v0 if it is actually 
+    # lowercase letter
+    
+    is_not_lowercase_plaintext_letter:
+    # Now we jump here if the plaintext_letter is not lowercase and
+    # we load in -1 into the $v0 as the return value because we can't
+    # do any encryptions other than a lowercase letter
+    li $v0, -1
+    
+    # There is no need to deallocate anything because we didn't use the runtime stack
+    # Let's test it!
+    
+    finished_encrypt_letter_exit:
+    # Then we jump back to the main
     jr $ra
 
 encrypt:
+    # This function will encrypt a plaintext message
+    # It will return two integers in which we will have to keep track of throughout
+    # the function calls
+    
+    # $a0 -> Ciphertext, where we putting our encrypted text
+    # $a1 -> Plaintext, the null terminated String that we want to encrypt
+    # $a2 -> Keyphrase, how to we going toget our ciphertext_alphabet
+    # $a3 -> Corpus, for the frequency to generate the plain_text alphabet
+    
+    # Before we make the function calls lets save these address of String into the
+    # So we are going to use 5 $s registers therefore we have to allocate a total of
+    # 20 bytes of runtime stack memory to store those $s registers before we can unlock them for our use
+    # Then we also have to allocate 4 more byte for our return location when we call the serveral functions
+    # or else encryption won't know how to return to the main
+    addi $sp, $sp, -24 # Allocating 24 byte of memory
+    
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    sw $s2, 8($sp) # Saving the $s2 register 
+    sw $s3, 12($sp) # Saving the $s3 register
+    sw $s4, 16($sp) # Saving the $s4 register
+    
+    # Now we have unlocked the 4 register we us to store the different arguments
+    move $s0, $a0 # $s0 have the Ciphertext
+    move $s1, $a1 # $s1 have the Plaintext
+    move $s2, $a2 # $s2 have the Keyphrase
+    move $s3, $a3 # $s3 have the Corpus
+    
+    # Then we also have to store the $ra on the stack as well
+    sw $ra, 20($sp)
+    
+    # Now everything is clear we can make the function calls right now
+    # We are going to make several function calls throughout the encryption
+    # The first step is to call to_lowercase on both Plaintext and Corpus
+    # We move $s1 into $a0 for turning Plaintext into lowercase
+    move $a0, $s1
+    
+    # We call the to_lowercase on Plaintext
+    jal to_lowercase
+    
+    # Now if we are here then we know that Plaintext is turned into lowercase
+    
+    # Then we have to also call to_lower on Corpus
+    # So we move $s3 into $a0 for turning Corpus into lowercase
+    move $a0, $s3
+    
+    # Then we call the to_lowercase on Corpus
+    jal to_lowercase
+    
+    # If we are here then Corpus is turned into lowercase
+    # First step is complete
+    
+    # Onto step two in which we have to allocate 26 word in the runtime stack
+    # 26 word is equal to total of 104 bytes, please don't forget to deallocate this later
+    addi $sp, $sp, -104
+    
+    # Step three!
+    # Using this new memory that we just have allocated we have to call the
+    # count_lowercase_letters function. Which takes two arguments
+    # $a0 -> A 26 word array that stores the count of each letter, only counting lowercase ignoring all others
+    # $a1 -> Is the corpus
+    # So this is the function call we are doing count_lowercase_letters(counts, corpus)
+    # For $a0 we just have to give $sp because that is total of 104 bytes
+    move $a0, $sp # The first argument which is the 26 word array in our runtime stack
+    move $a1, $s3 # This is the corpus after being turned into lowercase
+    
+    # Calling the count_lowercase_letters function
+    jal count_lowercase_letters 
+    
+    # Now if we are here then in the 26 word or 104 byte we have allocated we have the counts of
+    # the 26 letters stored in each word separately
+    
+    # Step FOURRRRR!
+    # Before we allocate the 28 byte of free memory let's save the current $sp address in
+    # register $t0 because this is going to the $a1 argument in step FIVE!
+    move $t0, $sp
+    
+    # Then we are going to allocate at least 27 bytes of memory on the stack to store the String
+    # returned by sort_alphabet_by_count. We have to round it to the next word which make it into 28 byte
+    addi $sp, $sp, -28
+    
+    # Step FIVE!
+    # We will be calling sort_alphabet_by_count
+    # $a0 will be $sp because that is the 28 byte we have just allocated in step FOUR
+    # $a1 will be counts array which we took the liberty to save in step FOUR which is $t0
+    move $a0, $sp # The first argument which is the 28 byte of space for function to store the sorted alphabets
+    move $a1, $t0 # The second argument is the counts that it is going to use to make the sorted alphabets
+    
+    # Calling the sort_alphabet_by_count function
+    jal sort_alphabet_by_count
+    
+    # Now at those 28 byte of memory we have the sorted alphabet generated from sort_alphabet_by_count
+    
+    # Onto step Six
+    # Before we allocate the 64 byte of free memory let's save the current $sp address again
+    # because lowercase_letters will be one of the arguments in step seven so we need this address to be saved
+    # We will save it in register $t0
+    move $t0, $sp
+    
+    # Then we will have to allocate at least 63 byte of memory this is going to be use to store
+    # the plaintext_alphabet generated when we call generate_plaintext_alphabet
+    # We have to round up to a word so we have to do 64 byte instead of 63
+    addi $sp, $sp, -64
+    
+    # Step SeVeN
+    # This step we will call generate_plaintext_alphabet
+    # $a0 -> plaintext_alphabet which is the current $sp
+    # $a1 -> lowercase_letters which we have saved in step six in $t0
+    move $a0, $sp # The first argument is the location of where we will be putting the plaintext_alphabet which is $sp
+    move $a1, $t0 # The second arugment is the lowercase_letters which we have saved in $t0
+    
+    # Then we can just call the function
+    jal generate_plaintext_alphabet
+    
+    # Step EIGHT
+    # We have to allocate at least 63 byte of memory to store ciphertext_alphabet
+    # again we round it up to 64 byte
+    addi $sp, $sp, -64
+    
+    # Step nine
+    # In this step we have to call on generate_ciphertext_alphabet
+    # $a0 -> is the place where we will be writing the ciphertext_alphabet which is just $sp
+    # $a1 -> second argument is the keyphrase which is $s2
+    move $a0, $sp # First argument is our place to store ciphertext_alphabet which is $sp
+    move $a1, $s2 # Second arugment is our keyphrase which is in $s2
+    
+    # Then we can just call the function
+    jal generate_ciphertext_alphabet
+    
+    # Step TEN!
+    # In a loop we have to loop over the plaintext, we call encrypt_letter on each lowercase letter
+    # if the letter is not lowercase then we just have to write it into ciphertext, don't call encrypt_letter. 
+    # If it is the return ascii value we write it into ciphertext
+    # Because plaintext will be null terminated we can have the stopping condition when it
+    # hits the null terminator
+    # We will be storing the loop counter in $s2 because we need that inorder to call the function
+    # And since we are going to be calling function our counters needs to be preserved
+    li $s2, 0 # We don't need the address of the corpus anymore so we can overwrite that with our counter
+    
+    # Now for this for loop we also have to have 2 counters
+    # One in $s3, since we don't need corpus anymore to keep track of the number of lowercase we encrypted
+    # One in $s4, to keep track of number of lowercase we didn't encryped but simply appended
+    li $s3, 0 # Counte for letter that did encrypt
+    li $s4, 0 # Counter for letter didn't encrypt
+    
+    # This is the for loop to encrypt each letter in the plaintext
+    for_loop_to_encrypt_each_letter:
+    	# Let's get each letter from the plaintext and put it in $t0
+    	lbu $t0, 0($s1)
+    	
+    	# As long as $t0 is not the null terminator we will do work on each letter
+    	beq $t0, $0, finished_encrypting_each_letters
+    	
+    	# If we are here then that means we have to encrypt the symbol we got
+    	# We have to make sure it is a lowercase letter before calling the function
+    	li $t1, 97 # Ascii value for 'a'
+    	li $t2, 122 # Ascii value for 'z'
+    	
+    	# If the ascii of the character is less than 97 then it is definitely not a lowercase
+    	# then we don't have to call the encrypt function on it just append it in ciphertext
+    	blt $t0, $t1, encrypt_not_lowercase_just_append
+    	
+    	# If the ascii of the character is greater than 122 then it is defintely not a lowercase
+    	# we don't have to call encrypt function we just have to append it in ciphertext
+    	bgt $t0, $t2, encrypt_not_lowercase_just_append
+    	
+    	# If we are here then that means that $t0 is indeed a lowercase which we have to call
+    	# encrypt_letter on it. But before we call it we have to prepare the arguments first
+    	# $a0 -> is just $t0 because it is the character we want to encrypt from the plaintext
+    	# $a1 -> is the index that the plaintext letter which is $s2
+    	# $a2 -> is the plaintext_alphabet which can be obtained by adding 64 byte to $sp
+    	# $a3 -> is the ciphertext_alphabet which is just $sp
+    	move $a0, $t0 # First argument which is the plaintext_letter
+    	move $a1, $s2 # Second argument which is the plaintext_letter index
+    	move $a3, $sp # Fourth argument which is the ciphertext_alphabet's address
+    	
+    	# Now to get the plaintext_alphabet's address we have to add 64 byte to $sp
+    	# We do that and put it in $t3
+    	addi $t3, $sp, 64
+    	
+    	# Then we move into $a2
+    	move $a2, $t3 # Third argument which is the plaintext_alphabet's address
+    	
+    	# Now everything is in place we can call the encrypt_letter function
+    	jal encrypt_letter
+    	
+    	# If we are here then that means $v0 contains the suppose encrypted letter of the plaintext
+    	# We have to store that into $s0 which is the ciphertext
+    	sb $v0, 0($s0)
+    	
+    	# After we store it we have to increment our index counter
+    	addi $s2, $s2, 1
+    	
+    	# We also have to increment our ciphertext address to move it to the next position
+    	addi $s0, $s0, 1
+    	
+    	# We need to also also increment the plaintext address to look at the next character for encryption
+    	addi $s1, $s1, 1
+    	
+    	# Then we also have to increment the $s3 because we encrypted a letter
+    	addi $s3, $s3, 1
+    	
+    	# Then we jump back up the loop to work on the next letter in plaintext
+    	j for_loop_to_encrypt_each_letter
+    	
+    	encrypt_not_lowercase_just_append:
+		# If we are here then that means the letter we received is not a lowercase
+		# In this case we just have to append $t0 to the ciphertext
+		sb $t0, 0($s0)
+		
+		# Then we increment the index counter
+		addi $s2, $s2, 1
+		
+		# Increment the ciphertext address
+		addi $s0, $s0, 1
+		
+		# Increment plaintext address
+		addi $s1, $s1, 1
+		
+		# Increment $s4 because we didn't encrypt a letter
+		addi $s4, $s4, 1
+		
+		# Then jump back up to the loop
+    		j for_loop_to_encrypt_each_letter
+    	
+    finished_encrypting_each_letters:
+    # Then if we are here we have to null terminate the ciphertext
+    # Which we can just do by adding a null terminator at 0($s0)
+    sb $0, 0($s0)
+    
+    # Finally we can move the return value
+    # Remember $s3 have the number of letters that are encrypted
+    # $s4 have the number of letters that are just appended
+    move $v0, $s3
+    move $v1, $s4
+    
+    # Then we are done! Now we have to deallocate everything we have used
+    # And restore all the registers we have used
+    
+    # We have to deallocate 260 byte first so we can get our stack pointer back to the $s registers
+    # that is saved on the stack
+    addi $sp, $sp, 260
+    
+    # We have to restore all of the $s registers we have used in our function
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    lw $s2, 8($sp) # Restoring the $s2 register 
+    lw $s3, 12($sp) # Restoring the $s3 register
+    lw $s4, 16($sp) # Restoring the $s4 register
+    
+    # We also have to make sure to restore the $ra from the runtime stack or else encrypt won't
+    # know where to return to
+    lw $ra, 20($sp) # Restoring the $ra for encrypt after all these inner function calls
+    
+    # Then we deallocate rest of the 24 byte we have used for the registers
+    addi $sp, $sp, 24
+    
+    # Then we can just return and done with this function!
     jr $ra
 
 decrypt:

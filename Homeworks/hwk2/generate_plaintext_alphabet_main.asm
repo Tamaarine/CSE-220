@@ -25,6 +25,8 @@ sorted_alphabet6: .asciiz "wlqsgkbdcuexianzoptjhfrymv"
 # Answer abcdefghijklmnopqrsstttuuuuvvvvvwwwwwwxxxxxxxyyyyyyyyzzzzzzzzz, checked
 sorted_alphabet7: .asciiz "zyxwvutsrqponmlkjihgfedcba"
 
+# Answer aaaaabcdeeeeeeeeefghhhhhhhiijklmnnnnoooooopqrsssttttttttuvwxyz, checked
+sorted_alphabet8: .asciiz "ethoansircdlmpuwfvbgqykjxz"
 
 .text
 .globl main
@@ -39,7 +41,7 @@ main:
 	li $s7, 69
 	
 	la $a0, plaintext_alphabet
-	la $a1, sorted_alphabet7
+	la $a1, sorted_alphabet8
 	jal generate_plaintext_alphabet
 	
 	# You must write your own code here to check the correctness of the function implementation.

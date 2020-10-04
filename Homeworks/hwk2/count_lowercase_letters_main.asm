@@ -4,6 +4,8 @@ message: .ascii "The specialization in artificial intelligence and data science 
 message1: .asciiz "We can only see a short distance ahead, but we can see plenty there that needs to be done. -Alan Turing"
 message2: .asciiz "Two exquisite objection delighted deficient yet its contained. Cordial because are account evident its subject but eat. Can properly followed learning prepared you doubtful yet him. Over many our good lady feet ask that. Expenses own moderate day fat trifling stronger sir domestic feelings. Itself at be answer always exeter up do. Though or my plenty uneasy do. Friendship so considered remarkably be to sentiments. Offered mention greater fifteen one promise because nor. Why denoting speaking fat indulged saw dwelling raillery. "
 message3: .asciiz "iusov, as a man man of breeding and deilcacy, could not but feel some inwrd qualms, when he reached the ather uperior's with van: he felt ashamed of havin lost his temper. e felt that he ought to have disdaimed that despicable wretch, yodor avlovitch"
+message4: .asciiz "when in the course of human events, it becomes necessary for one people to dissolve the political bands which have connected them with another, and to assume among the powers of the earth, the separate and equal station to which the laws of nature and of nature's god entitle them, a decent respect to the opinions of mankind requires that they should declare the causes which impel them to the separation."
+
 .text
 .globl main
 main:
@@ -16,7 +18,7 @@ main:
 	li $s6, 69
 	li $s7, 69
 	la $a0, counts
-	la $a1, message2
+	la $a1, message4
 	jal count_lowercase_letters
 
 	# You must write your own code here to check the correctness of the function implementation.

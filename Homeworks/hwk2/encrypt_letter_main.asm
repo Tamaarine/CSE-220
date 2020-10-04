@@ -1,9 +1,9 @@
 .data
-plaintext_letter: .byte 'u'
-letter_index: .word 3
-plaintext_alphabet: .ascii "abbbbbbbbcdefffffffgggghiiijkklmnopqrstuuuuuvvvvvvwxxxxxxxxxyz\0"
-ciphertext_alphabet: .ascii "StonyBrkUivesNwYadfAmcbghjlpquxzCDEFGHIJKLMOPQRTVWXZ0123456789\0"
-
+plaintext_letter: .byte 'f'
+letter_index: .word 16
+plaintext_alphabet: .asciiz "abcccccdeeeeeeeeeffffffffgghijkkklmnoppppqrstuvwxxxxxxyzzzzzzz"
+ciphertext_alphabet: .asciiz "StonyBrkUivesNwYadfAmcbghjlpquxzCDEFGHIJKLMOPQRTVWXZ0123456789"
+# dfAmcbgh
 .text
 .globl main
 main:
@@ -14,7 +14,11 @@ main:
 	jal encrypt_letter
 	
 	# You must write your own code here to check the correctness of the function implementation.
-
+	# $v0 have our letter we are suppose to replace
+	move $a0, $v0
+	li $v0, 11
+	syscall
+	
 	li $v0, 10
 	syscall
 	

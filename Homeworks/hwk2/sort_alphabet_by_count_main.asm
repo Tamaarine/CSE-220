@@ -7,6 +7,7 @@ counts3: .word 23 26 29 1 20 9 15 30 24 20 23 7 17 15 5 4 17 14 12 24 14 1 0 4 1
 counts4: .word 19 3 7 12 26 5 2 17 12 0 0 9 7 9 13 3 1 9 10 17 6 6 4 0 2 0
 counts5: .word 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26
 counts6: .word 29 9 10 24 64 13 12 7 30 2 3 19 9 32 30 10 1 28 25 35 14 2 7 3 14 0
+counts7: .word 26 2 13 11 50 6 2 27 17 0 1 10 9 24 27 9 2 14 22 37 9 3 7 0 2 0
 .text
 .globl main
 main:
@@ -20,11 +21,14 @@ main:
 	li $s7, 69
 	
 	la $a0, sorted_alphabet
-	la $a1, counts6
+	la $a1, counts7
 	jal sort_alphabet_by_count
 	
 	# You must write your own code here to check the correctness of the function implementation.
-
+	la $a0, sorted_alphabet
+	li $v0, 4
+	syscall
+	
 	li $v0, 10
 	syscall
 	
