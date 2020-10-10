@@ -21,7 +21,7 @@ main:
 	li $s7, 69
 	
 	la $a0, sorted_alphabet
-	la $a1, counts7
+	la $a1, counts3
 	jal sort_alphabet_by_count
 	
 	# You must write your own code here to check the correctness of the function implementation.

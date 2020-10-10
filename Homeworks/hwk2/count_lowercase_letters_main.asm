@@ -18,7 +18,7 @@ main:
 	li $s6, 69
 	li $s7, 69
 	la $a0, counts
-	la $a1, message4
+	la $a1, message1
 	jal count_lowercase_letters
 
 	# You must write your own code here to check the correctness of the function implementation.

@@ -1949,7 +1949,7 @@ decrypt:
         # We load in the byte again
         lbu $t0, 0($s4)
         
-        # We increment $s2 because it is alphabet
+        # We increment $s2 because it is alphabet or number
         addi $s2, $s2, 1
         
         # Jump back up the loop

@@ -86,14 +86,14 @@ main:
 	li $s6, 69
 	li $s7, 69
 	la $a0, ciphertext_alphabet
-	la $a1, keyphrase19
+	la $a1, keyphrase17
 	
 	jal generate_ciphertext_alphabet
 	
 	# You must write your own code here to check the correctness of the function implementation.
 	# Because the value is returned in $v0, we move it to $a0 to see if it is correct
-	la $a0, ciphertext_alphabet
-	li $v0, 4
+	move $a0, $v0
+	li $v0, 1
 	syscall
 	
 	li $v0, 10

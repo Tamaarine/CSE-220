@@ -1,7 +1,7 @@
 .data
 str: .asciiz "I want to die KILL ME"
 ch: .byte 'E'
-start_index: .word 22
+start_index: .word 0
 
 .text
 .globl main

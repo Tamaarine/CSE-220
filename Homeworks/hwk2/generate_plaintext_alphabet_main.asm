@@ -41,11 +41,14 @@ main:
 	li $s7, 69
 	
 	la $a0, plaintext_alphabet
-	la $a1, sorted_alphabet8
+	la $a1, sorted_alphabet2
 	jal generate_plaintext_alphabet
 	
 	# You must write your own code here to check the correctness of the function implementation.
-
+	la $a0, plaintext_alphabet
+	li $v0, 4
+	syscall
+	
 	li $v0, 10
 	syscall
 	
