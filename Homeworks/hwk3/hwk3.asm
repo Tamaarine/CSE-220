@@ -420,9 +420,153 @@ load_game:
     jr $ra
 
 get_slot:
+    # If we are here then we have to basically return the character stored in grid[row][col]
+    # The grid is already stored in row-major order so we have to use this formula
+    # effect_addr = base_addr + element_size_in_byte ( i * num_columns + j) to get
+    # the byte that we are suppose to load in unsigned
+    
+    # $a0 -> The pointer to a valid struct
+    # $a1 -> The row where we read the character
+    # $a2 -> The column where we are reading the character
+    # Output -> $v0, Output the ascii value of the character at grid[row][col], it will return
+    # -1 if the row or col isn't within valid range [0, row-1] and [0, col-1]
+    
+    # Now let's load in the number of rows and columns first so we can have a valid range
+    # to compare our arguments
+    # We will load row into $t0
+    # Load col into $t1
+    # Keep in mind that 0($a0) stores the row in the struct
+    lb $t0, 0($a0)
+    
+    # 1($a0) stores the column in the struct
+    lb $t1, 1($a0)
+
+    # Now we have the row and column we can start comparing whether or not the given
+    # argument is within the valid range
+    
+    # This means that if the given row is a negative number it won't be valid
+    blt $a1, $0, invalid_row_col_argument
+    
+    # This means that we branch if the given row is greater than or equal to the row of the game grid
+    # Not valid because it is from [0, row-1]
+    bge $a1, $t0, invalid_row_col_argument
+    
+    # If we are here then row is valid but we also have to check if col is also valid
+    # Same thing we check if the given col is a negative it won't be valid
+    blt $a2, $0, invalid_row_col_argument
+    
+    # If we are here then $a2 is definitely greater than or equal to 0 
+    # If $a2 is greater than or equal to the column of the game grid
+    # it won't be valid because it is from [0, col-1]
+    bge $a2, $t1, invalid_row_col_argument
+    
+    # Now if we are here then that means row and column are valid which we can actually get 
+    # the actual character from the grid now
+    # We must first grab the struct address which stores the grid, and it is at 5($a0)
+    # Let's store it in $t3
+    addi $t3, $a0, 5
+    
+    # Then we can use $t3 as the base address to compute the effective address of the character
+    # effect_addr = base_addr + element_size_in_byte ( i * num_columns + j)
+    # element_size_in_byte = 1
+    # i = $a1
+    # j = $a2
+    # num_columns = $t1
+    
+    # i * num_columns + j into $t4
+    mul $t4, $a1, $t1
+    
+    # Then we add j to $t4
+    add $t4, $t4, $a2
+    
+    # Then add base address $t3 with $t4
+    add $t3, $t3, $t4
+    
+    # Then we can just do lbu from $t3 as our return value
+    lbu $v0, 0($t3)
+    
+    # Then we are essentially done!
+    j finished_getting_slot_algorithm
+    
+    invalid_row_col_argument:
+    # If we are here then that means that the given row and column is invalid
+    li $v0, -1
+    
+    finished_getting_slot_algorithm:
+    # No memory is used we can just return
     jr $ra
 
 set_slot:
+    # This function sets grid[row][col]'s char to ch basically it
+    
+    # $a0 -> The pointer to a valid struct
+    # $a1 -> The row where we storing the char
+    # $a2 -> The column where we storing the char
+    # $a3 -> The char that we are storing
+    # Output -> Returns -1 if the row or column is outside of valid range,
+    # else return char that we just stored
+    
+    # So again let's load in the number of rows and columns for comparing valid range
+    # $t0 for the game's row
+    # $t1 for the game's column
+    lb $t0, 0($a0) # Gets the row from the struct
+    
+    lb $t1, 1($a0) # Gets the column from the struct
+    
+    # Now we do logic checking, for the given argument
+    # If the given row is less than 0 it is negative hence invalid argument
+    blt $a1, $0, invalid_row_col_argument_part2
+    
+    # If we are here it is greater than or equal to 0 but we also should check upper bound
+    # This means that we branch if the row is greater than or equal to game row
+    bge $a1, $t0, invalid_row_col_argument_part2
+    
+    # We also do the same for column
+    # Means that the column is a negative value hence invalid
+    blt $a2, $0, invalid_row_col_argument_part2
+    
+    # Check if is less than the upper bound
+    bge $a2, $t1, invalid_row_col_argument_part2
+    
+    # Now if we are here then that means that the row and col are valid
+    # Hence we can proceed to store $a3 into grid[row][col]
+    # We must first grab the struct address which stores the grid, and it is at 5($a0)
+    # Let's store it in $t3
+    addi $t3, $a0, 5
+    
+    # Then we can use $t3 as the base address to compute the effective address of the character
+    # effect_addr = base_addr + element_size_in_byte ( i * num_columns + j)
+    # element_size_in_byte = 1
+    # i = $a1
+    # j = $a2
+    # num_columns = $t1
+    
+    # i * num_columns + j into $t4
+    mul $t4, $a1, $t1
+    
+    # Then we add j to $t4
+    add $t4, $t4, $a2
+    
+    # Then add base address $t3 with $t4
+    add $t3, $t3, $t4
+    
+    # Now $t3 have the effective address where we are storing the given char
+    # We just store it 
+    sb $a3, 0($t3)
+    
+    # And we just have to put the char's value into $v0 as the return value
+    move $v0, $a3
+    
+    # Then we can just jump there because we are done
+    j finished_setting_slot_algorithm
+    
+    invalid_row_col_argument_part2:
+    # If we are here then that means the given row or col is invalid in range
+    # We just return -1
+    li $v0, -1
+
+    finished_setting_slot_algorithm:
+    # Nothign to deallocate so we can just jump back to main
     jr $ra
 
 place_next_apple:

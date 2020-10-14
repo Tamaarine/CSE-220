@@ -1,6 +1,6 @@
 .data
-row: .byte 1
-col: .byte 5
+row: .byte 4
+col: .byte 11
 .align 2
 state:
 .byte 5  # num_rows
@@ -20,6 +20,13 @@ lb $a2, col
 jal get_slot
 
 # You must write your own code here to check the correctness of the function implementation.
+# If we are here $v0 contain the ascii character we are suppose to get
+move $a0, $v0
+
+# We print it
+li $v0, 11
+syscall
+
 
 li $v0, 10
 syscall
