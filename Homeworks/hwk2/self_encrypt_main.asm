@@ -38,8 +38,8 @@ corpus2: .asciiz "Miusov, as a man man of breeding and deilcacy, could not but f
 
 # 93
 # 19
-# U5hTpR: vAaLo4 yifqwKS dKt2zhA1 ucsxR a2b XD 5sQ pAkuuwfVp3r 2Tvto Du xBtDT EAa 2AT2ffrQRu2x d1UkzIYR nU kXyCS.
-plaintext3: .asciiz "Thesis: Andrew Hacker’s argument fails due to his ineffective usage of logos and unsuccessful attempts at ethos."
+# U5hTpR: vAaLo4 yifqwK'S dKt2zhA1 ucsxR a2b XD 5sQ pAkuuwfVp3r 2Tvto Du xBtDT EAa 2AT2ffrQRu2x d1UkzIYR nU kXyCS.
+plaintext3: .asciiz "Thesis: Andrew Hacker's argument fails due to his ineffective usage of logos and unsuccessful attempts at ethos."
 keyphrase3: .asciiz "Evidence: Of all who embark on higher education, only 58% end up with bachelor’s degrees."
 corpus3: .asciiz "Andrew Hacker points out that the graduates who received a bachelor degree in Mathematics are rare. However, this does not prove the point that math courses causes impedance in obtaining a degree. The one percent of degrees in mathematics does not incorporate other field of studies that also employs algebra or math courses in general."
 
@@ -110,9 +110,9 @@ main:
  	la $a0, ciphertext
  	
  	# Change these argument's number here
-	la $a1, plaintext1
-	la $a2, keyphrase1
-	la $a3, corpus1
+	la $a1, plaintext3
+	la $a2, keyphrase3
+	la $a3, corpus3
 	
 	jal encrypt
 		

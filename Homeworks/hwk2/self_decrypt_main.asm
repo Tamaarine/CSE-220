@@ -39,7 +39,7 @@ corpus2: .asciiz "Miusov, as a man man of breeding and deilcacy, could not but f
 # 93
 # 19
 # thesis: andrew hackers argument fails due to his ineffective usage of logos and unsuccessful attempts at ethos.
-ciphertext3: .asciiz "U5hTpR: vAaLo4 yifqwKS dKt2zhA1 ucsxR a2b XD 5sQ pAkuuwfVp3r 2Tvto Du xBtDT EAa 2AT2ffrQRu2x d1UkzIYR nU kXyCS."
+ciphertext3: .asciiz "U5hTpR: vAaLo4 yifqwK'S dKt2zhA1 ucsxR a2b XD 5sQ pAkuuwfVp3r 2Tvto Du xBtDT EAa 2AT2ffrQRu2x d1UkzIYR nU kXyCS."
 keyphrase3: .asciiz "Evidence: Of all who embark on higher education, only 58% end up with bachelor’s degrees."
 corpus3: .asciiz "Andrew Hacker points out that the graduates who received a bachelor degree in Mathematics are rare. However, this does not prove the point that math courses causes impedance in obtaining a degree. The one percent of degrees in mathematics does not incorporate other field of studies that also employs algebra or math courses in general."
 
@@ -57,7 +57,7 @@ ciphertext5: .asciiz "TEkBf 1bjRbU 6dDH Ubv KNDE 4N UK 6xwl, q RKY T 26gFzAS xF 
 keyphrase5: .asciiz "The music that we love music that we want feat Minto, DJ-S3RL"
 corpus5: .asciiz "The myth of the Vanishing Indian influenced the United States into developing the Civilization program. After the United States won their independence from Britain, the Native Americans fell under the rule of the U.S. and were treated like defeated enemies because they sided with Britain during the revolution."
 
-# 30
+# 15
 # 8
 # cse, cse, cse, ams, wst
 ciphertext6: .asciiz "olI, hlI, mlI, jPl, 0lp"
