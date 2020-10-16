@@ -744,8 +744,68 @@ place_next_apple:
     jr $ra
 
 find_next_body_part:
+    # This function basically scans the top, down, left, and right of gamegrid[row][col]
+    # to check if it is able to find the specified target part. We will be calling
+    # get_slot four times to do the checking
     
-
+    # $a0 -> The valid game struct starting address
+    # $a1 -> The row that we are searching from
+    # $a2 -> The column that we are searching from
+    # $a3 -> The target_part of the snake body we looking for around (row, col)
+    # Output -> the row of the target, returns -1 if (row, col) given is not valid or target not found
+    # Output -> the column of the target, returns -1 if (row, col) given is not valid or target not found
+    
+    # Since we are going to be calling the get_slot four times we have to save our given arguments
+    # four arugments, 4 byte eachs makes it 16 byte in total. We have to preserve $ra as well
+    # hence total of 20 bytes for now
+    addi $sp, $sp, -20 # Allocating 16 byte in the run time stack
+    
+    # Preserving the $s registers before using them
+    sw $s0, 0($sp) # Saving $s0 register
+    sw $s1, 4($sp) # Saving $s1 register
+    sw $s2, 8($sp) # Saving $s2 register
+    sw $s3, 12($sp) # Saving $s3 register
+    
+    # Saving the return address else find_next_body_part won't know where to return to
+    sw $ra, 16($sp)
+    
+    # Saving the arguments
+    move $s0, $a0 # $s0 have the game struct address
+    move $s1, $s1 # $s1 have the row that we are searching from
+    move $s2, $s2 # $s2 have the column that we are searching from
+    move $s3, $s3 # $s3 have the target_part that we are looking for
+    
+    # First things first we have to make sure that the given row and column arguments
+    # from where we are looking from are valid hence let's grab the game row and column from the struct
+    # We can grab the row from 0($s0)
+    lb $t0, 0($s0)
+    
+    # We can grab the column from 1($s0)
+    lb $t1, 1($s0)
+    
+    # Now let's do the checking to make sure both the given row and column are in valid range
+    # If the row is less than 0, negative can't be valid
+    blt $s1, $0, invalid_row_col_argument_part3
+    
+    # If the row's valid is greater than or equal to the game's row then it can't be valid
+    # because the valid range is from [0, game_row - 1]
+    bge $s1, $t0, invalid_row_col_argument_part3
+    
+    # Now if we are here row is definitely valid but we also need to check it for the column as well    
+    # If the column is less than 0, negative can't be valid
+    blt $s2, $0, invalid_row_col_argument_part3
+    
+    # If the column's valid is >= to the game's column then it can't be valid
+    bge $s2, $t1, invalid_row_col_argument_part3
+    
+    # Okay if we are here the given row and column argument are both valid hence we
+    # start performing the checking
+    
+    
+    invalid_row_col_argument_part3:
+    
+    
+    # Deallocating the memory that we have used
  
     jr $ra
 
