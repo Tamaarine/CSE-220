@@ -570,9 +570,183 @@ set_slot:
     jr $ra
 
 place_next_apple:
+    # This function basically look through the apple array that is given of length apple_length
+    # Every two element represent an apple in the position (row, col) which hasn't been placed
+    # (-1, -1) pair is an apple that is already placed. It will look through every pair to see if
+    # at that position is there a '.', if it is '.' it will replace it with a 'a' by calling set_slot
+    # then the apple array will be changed to both (-1, -1) to reflect that it is placed. If the
+    # space is already occupied by a wall or snake then it will skip that pair and look at the next pair
+    # until a valid apple is placed. We are promised that a valid apple is in the array
+    
+    # We must call get_slot and set_slot
+    
+    # $a0 -> The valid struct that contains game's information
+    # $a1 -> The starting address to the apple byte array
+    # $a2 -> The number of pairs that is in the array, say 6 element = 3 pairs
+    # Output -> $v0, the row that the apple is placed at
+    # Output -> $v1, the column that the apple is placed at
+    
+    # Since we are going to call the functions we obviously have to preserve each function arguments
+    # and the return address of place_next_apple on the run time stack.
+    # There is 3 arguments, so that is 12 bytes plus 4 more for $ra will need 16
+    # But we need 3 more registers to store the row and col values that we get from the array
+    # Then another one register to keep as the loop counter for going through the array
+    # so we can call the functions to check whether it is valid or not adding another 12 byte
+    addi $sp, $sp, -28 # Allocating a total of 28 byte on the stack
+    
+    # Saving the $s registers before we can use them
+    sw $s0, 0($sp) # Saving $s0 register
+    sw $s1, 4($sp) # Saving $s1 register
+    sw $s2, 8($sp) # Saving $s2 register
+    sw $s3, 12($sp) # Saving $s3 register
+    sw $s4, 16($sp) # Saving $s4 register
+    sw $s5, 20($sp) # Saving $s5 register
+    
+    # Saving the return address as well so we can call functions
+    sw $ra, 24($sp)
+    
+    # Now we unlock $s0 - $s2 we can save our arguments in them
+    move $s0, $a0 # $s0 will have the game_state struct address
+    move $s1, $a1 # $s1 will have the starting address to the apple byte array
+    move $s2, $a2 # $s2 will have the number of pairs in the apple array
+    
+    # Now we have to have a loop that traverse through the apple array
+    # it will have a counter which keeps track of which pair we are at and is 0-indexed
+    # We will use $s5 as that counter and $s2 is our stopping condition
+    # $s5 beause we need a register that is preserved across function call
+    li $s5, 0
+    
+    # Our for loop to traverse through the apple array
+    for_loop_for_apple_array:
+    	# Let's just do our stopping condition and get it out of the way
+    	# Once our index counter is equal to or greater than the number of pair of apples
+    	# we are done
+    	bge $s5, $s2, finished_for_loop_for_apple_array
+    	
+    	# However, if we are here then we have a valid index to grab the (row, col) from the apple
+    	# To grab the row we do pair_counter * 2
+    	# To grab the column we do pair_counter * 2 +1
+    	# As the index offset and add it to the base address
+    	# We load 2 into register $t7 for multiplication
+    	li $t7, 2
+    	
+    	# We will store the row's offset in $t1 and column's offset in $t2
+    	# Multiplying pair_counter * 2 for row's offset
+    	mul $t1, $s5, $t7
+    	
+    	# Multiplying pair_counter * 2 for column's offset
+    	mul $t2, $s5, $t7
+    	
+    	# Then we add 1 to $t2 to get the column's offset
+    	addi $t2, $t2, 1
+    	
+    	# Now in $t1 we have offset for row and $t2 have offset for column
+    	# We just have to add the base_address to get the effective address for each
+    	add $t1, $t1, $s1 # Effective address for apple's row
+    	add $t2, $t2, $s1 # Effective address for apple's column
+    	
+    	# Let's save the effective address into the $s3 and $s4 registers
+    	move $s3, $t1 # $s3 have effective address of row value
+    	move $s4, $t2 # $s4 have effetive address of column value
+    	
+    	# Now we have to call get_slot to really check what is in that grid[row][col]
+    	# before we can actually place it in that position
+    	
+    	# Preparing to call get_slot
+    	# $a0 -> The struct
+    	# $a1 -> The row
+    	# $a2 -> The column
+    	move $a0, $s0
+    	lb $a1, 0($s3)
+    	lb $a2, 0($s4)
+    	
+    	# Now we can actually call the get_slot function
+    	jal get_slot
+    	
+    	# After in $v0 have the character that is located in grid[row][col]
+    	# We have to check if it is an empty space '.' else if it is a wall or snake body
+    	# We cannot put our apples there
+    	li $t7, '.' # Load in '.' for comparsion
+    	
+    	# We will branch if the return character is not a period
+    	# which means we cannot put our apples there
+    	bne $v0, $t7, unable_to_place_apple
+    	
+    	# However, if we are here that means we are able to put our apples
+    	# in this (row, col) position so we will do so with set_slot
+    	# Preparing to call set_slot
+    	# $a0 -> The struct
+    	# $a1 -> The row
+    	# $a2 -> The column
+    	# $a3 -> 'a' we are storing
+    	move $a0, $s0
+    	lb $a1, 0($s3)
+    	lb $a2, 0($s4)
+    	
+    	# Storing a and using it as our character for $a3
+    	li $t7, 'a'
+    	move $a3, $t7
+    	
+    	# Then we are ready to call set_slot
+    	jal set_slot
+    	
+    	# Then that character is already set, it is guranteeded to work
+    	# because the row and column we get is definitely valid.
+    	# If it is not valid then get_slot will return a negative value and
+    	# it will go to unable_to_place_apple. If we are here then that row and column
+    	# is definitely a '.' character in which we can replace
+    	
+    	# Before we set the row and value to -1 let's grab it again to put into our
+    	# output value
+    	lb $v0, 0($s3) # $v0 is our row
+    	lb $v1, 0($s4) # $v1 is our col
+    	
+    	# Then we have to update the (row, col) to (-1, -1) because we have placed into our
+    	# game_state already which we can do with $s3, and $s4
+    	li $t7, -1
+    	
+    	# Updating the pair value after placing the apple
+    	sb $t7, 0($s3) # Storing row as -1
+    	sb $t7, 0($s4) # Storing col as -1 
+    	
+    	# Then we jump back out because we found an apple that we can place
+    	# so we are done traversing the loop, break out early
+    	j finished_for_loop_for_apple_array
+    	
+    	unable_to_place_apple:
+    	# If we are here then we are unable to put an apple in the current (row, col) pair of apple
+    	# Hence we just move onto the next pair
+    	
+    	# Incrementing the pair counter
+    	addi $s5, $s5, 1
+    	
+    	# Jump back up the loop
+    	j for_loop_for_apple_array
+    	
+    finished_for_loop_for_apple_array:
+    # If we are here then we have finished placing the apples
+    
+    # We have to restore each registers
+    lw $s0, 0($sp) # Restoring $s0 register
+    lw $s1, 4($sp) # Restoring $s1 register
+    lw $s2, 8($sp) # Restoring $s2 register
+    lw $s3, 12($sp) # Restoring $s3 register
+    lw $s4, 16($sp) # Restoring $s4 register
+    lw $s5, 20($sp) # Restoring $s5 register
+
+    # Restore the return address else it won't know where to return to
+    lw $ra, 24($sp) # Restoring the return address
+    
+    # Deallocating the 28 byte memory that we have used
+    addi $sp, $sp, 28
+    
+    # Then jump back to main
     jr $ra
 
 find_next_body_part:
+    
+
+ 
     jr $ra
 
 slide_body:
