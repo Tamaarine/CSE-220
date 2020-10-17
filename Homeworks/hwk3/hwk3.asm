@@ -1249,9 +1249,423 @@ slide_body:
     jr $ra
 
 add_tail_segment:
+    # If we are here then this function takes in the tail coordinate of the snake
+    # and a direction relative to the snake's tail. It then adds a new tail to the snake
+    # in that given direction. This is the helper function for increase_snake_length
+    
+    # $a0 -> The given game struct
+    # $a1 -> Direction of where to add the new tail, U = place up
+    # D = place down, L = place left, R = place right
+    # $a2 -> The tail's row
+    # $a3 -> The tail's col
+    # Output -> $v0, the new length after new tail is added. It will return -1 if the new tail
+    # can't be placed due to not a '.' slot, or if the snake is at max length or if the
+    # direction is not valid
+    
+    # So we will check the directions first to see if it is valid or not before
+    # we even attempt to add in the new tail segment
+    
+    # We will be calling functions so let's save these arguments first
+    # 4 registers means 16 bytes in total plus the return address so 20 bytes
+    addi $sp, $sp, -20 # Allocating 20 bytes in the run time stack
+    
+    # Saving the $s registers before using them
+    sw $s0, 0($sp) # Storing $s0 register
+    sw $s1, 4($sp) # Storing $s1 register
+    sw $s2, 8($sp) # Storing $s2 register
+    sw $s3, 12($sp) # Storing $s3 register
+    
+    # Also the return address
+    sw $ra, 16($sp)
+    
+    # Then we can proceed to save the argument
+    move $s0, $a0 # $s0 have the given game struct
+    move $s1, $a1 # $s1 have the direction where the new tail is going to be added
+    move $s2, $a2 # $s2 have tail's row
+    move $s3, $a3 # $s3 have the tail's col
+    
+    # We will be using $t7 to store our character for comparsion
+    li $t7, 'U'
+    
+    # This means that we are putting the tail at up
+    beq $s1, $t7, valid_direction_argument
+    
+    li $t7, 'D'
+    
+    # This means that we are putting the tail at down
+    beq $s1, $t7, valid_direction_argument
+    
+    li $t7, 'R'
+    
+    # This means that we are putting the tail at right
+    beq $s1, $t7, valid_direction_argument
+    
+    li $t7, 'L'
+    
+    # This means that we are putting the tail at left
+    beq $s1, $t7, valid_direction_argument
+    
+    # If we are here then the given direction is valid
+    # We can just return -1 and finish with the functions
+    li $v0, -1
+    
+    j finished_add_tail_algorithm
+    
+    valid_direction_argument:
+    # If we are here then the direction given is definitely valid next we must check that
+    # the length of the snake is less than 35. It can't be equal or greater than 35 because
+    # that is already the max length
+    # So let's load in the length of the snake first
+    lb $t0, 4($s0)
+    
+    # Now if the body length is already 35 or greater it is invalid
+    # so we just return because we can't put a new tail anymore due to body length at max already
+    li $t7, 35
+    bge $t0, $t7, invalid_body_length
+    
+    # However if we are here then that means the body is within reasonable range to add a new body part
+    # but we still have to check whether or not it is valid to put the new tail in that direction
+    # If the direction is up we will be checking the up direction for available space
+    li $t7, 'U'
+    beq $s1, $t7, place_new_tail_up
+    
+    # If the direction is down we will be checking the down direction for available space
+    li $t7, 'D'
+    beq $s1, $t7, place_new_tail_down
+    
+    # If the direction is right we will be checking right direction for available space
+    li $t7, 'R'
+    beq $s1, $t7, place_new_tail_right
+    
+    # If the direction is left we will be checking left direction for available space
+    li $t7, 'L'
+    beq $s1, $t7, place_new_tail_left
+    
+    place_new_tail_up:
+    # Check the up space of the tail first before placing
+    # Subtract one from row, the col is the same
+    addi $t0, $s2, -1
+    
+    # Then we have to call get_slot to get that character to see if we can put the new snake body there
+    move $a0, $s0 # The game struct
+    move $a1, $t0 # The row we checking
+    move $a2, $s3 # The col we checking
+    
+    # Call it 
+    jal get_slot
+    
+    # In $v0 we have the character that is returned in that space
+    # If it is '.' then we are able to put the new tail there if it is not '.' then we return
+    # -1 because it is not a free space to us to add the tail of the snake 
+    li $t7, '.'
+    
+    # If the space is not a '.' then we can't put it there
+    bne $v0, $t7, unable_to_place_tail_in_direction
+    
+    # However if it is a '.' then we can put it there
+    # We need the current tail's character so we can increment it for the next tail
+    move $a0, $s0 # The game struct
+    move $a1, $s2 # The row we checking
+    move $a2, $s3 # The col we checking
+    
+    jal get_slot
+    
+    # Now if the current tail is a '9' then we have to do a ascii jump to 'A'
+    li $t7, '9'   
+    beq $v0, $t7, ascii_jump_for_snake_up
+    
+    # If not equal to '9' then we just have to increment it like normal
+    addi $v0, $v0, 1
+    
+    # Then we have to actually place the new tail down in that direction
+    j actual_placement_up
+    
+    ascii_jump_for_snake_up:
+    li $v0, 'A'
+    
+    actual_placement_up:
+    # We will putting the snake in the place that is up of the tail using the formula
+    # effect_addr = base_addr + element_size_in_byte ( i * num_columns + j)
+    lb $t0, 1($s0) # Getting the number of columns of the game grid
+    
+    # Get the row that we are putting the new tail in
+    addi $t1, $s2, -1
+    
+    # Multiply it with the placement row and store result in $t0
+    mul $t0, $t0, $t1
+    
+    # Then we add j which is just the col
+    add $t0, $t0, $s3
+    
+    # Get the base_address into $t1
+    addi $t1, $s0, 5
+    
+    # Add it with $t0 to get the effective address
+    add $t0, $t0, $t1
+    
+    # Now in $t0 we have the address where we are putting the next body part which is $v0
+    sb $v0, 0($t0)
+    
+    # After placing the new body segment down we must increment the snake's length
+    j increment_snake_length
+
+
+    place_new_tail_down:
+    # Check the down space of the tail first before placing
+    # Add one from row, the col is the same
+    addi $t0, $s2, 1
+    
+    # Prepare to call get_slot
+    move $a0, $s0 # The game struct
+    move $a1, $t0 # The row we checking
+    move $a2, $s3 # The col we checking
+    
+    # Call it 
+    jal get_slot
+    
+    # In $v0 we have the character that is returned
+    # If it is '.' then we can put it there else -1 since it is not a free space
+    li $t7, '.'
+    
+    # If the placement is not a '.' we can't put the new tail there
+    bne $v0, $t7, unable_to_place_tail_in_direction
+    
+    # However if it is a '.' then we can put it there
+    # We need the current tail's character so we can increment it for the next tail
+    move $a0, $s0 # The game struct
+    move $a1, $s2 # The row we checking
+    move $a2, $s3 # The col we checking
+    
+    jal get_slot
+    
+    # Now if the current tail is a '9' then we have to do a ascii jump to 'A'
+    li $t7, '9'   
+    beq $v0, $t7, ascii_jump_for_snake_down
+    
+    # If not equal to '9' then we just have to increment it like normal
+    addi $v0, $v0, 1
+    
+    # Then we have to actually place the new tail down in that direction
+    j actual_placement_down
+    
+    ascii_jump_for_snake_down:
+    li $v0, 'A'
+    
+    actual_placement_down:
+    # We will putting the snake in the place that is down of the tail using the formula
+    # effect_addr = base_addr + element_size_in_byte ( i * num_columns + j)
+    lb $t0, 1($s0) # Getting the number of columns of the game grid
+    
+    # Get the row that we are putting the new tail in
+    addi $t1, $s2, 1
+    
+    # Multiply it with the placement row and store result in $t0
+    mul $t0, $t0, $t1
+    
+    # Then we add j which is just the col
+    add $t0, $t0, $s3
+    
+    # Get the base_address into $t1
+    addi $t1, $s0, 5
+    
+    # Add it with $t0 to get the effective address
+    add $t0, $t0, $t1
+    
+    # Now in $t0 we have the address where we are putting the next body part which is $v0
+    sb $v0, 0($t0)
+    
+    # After placing the new body segment down we must increment the snake's length
+    j increment_snake_length
+    
+    
+    place_new_tail_right:
+    # Checking the right space of the tail first before placing
+    # Add one to col, the row is the same
+    addi $t0, $s3, 1
+    
+    # Prepare to call get_slot
+    move $a0, $s0 # The game struct
+    move $a1, $s2 # The row we checking
+    move $a2, $t0 # The col we checking
+    
+    # Call it 
+    jal get_slot
+    
+    # In $v0 we have the chararcter that is returned
+    # if it is '.' then we can put it there else -1 since it is not a free space
+    li $t7, '.'
+    
+    # If the placement is not a '.' we can't put the new tail there
+    bne $v0, $t7, unable_to_place_tail_in_direction
+    
+    # However if it is a '.' then we can put it there
+    # We need the current tail's character so we can increment it for the next tail
+    move $a0, $s0 # The game struct
+    move $a1, $s2 # The row we checking
+    move $a2, $s3 # The col we checking
+    
+    jal get_slot
+    
+    # Now if the current tail is a '9' then we have to do a ascii jump to 'A'
+    li $t7, '9'   
+    beq $v0, $t7, ascii_jump_for_snake_right
+    
+    # If not equal to '9' then we just have to increment it like normal
+    addi $v0, $v0, 1
+    
+    # Then we have to actually place the new tail down in that direction
+    j actual_placement_right
+    
+    ascii_jump_for_snake_right:
+    li $v0, 'A'
+    
+    actual_placement_right:
+    # We will putting the snake in the place that is down of the tail using the formula
+    # effect_addr = base_addr + element_size_in_byte ( i * num_columns + j)
+    lb $t0, 1($s0) # Getting the number of columns of the game grid
+    
+    # Multiply the column with the row and store into $t0
+    mul $t0, $t0, $s2
+    
+    # Then we add j which is just the col
+    add $t0, $t0, $s3
+    
+    # But have to add one for the next column
+    addi $t0, $t0, 1
+    
+    # Get the base_address into $t1
+    addi $t1, $s0, 5
+    
+    # Add it with $t0 to get the effective address
+    add $t0, $t0, $t1
+    
+    # Now in $t0 we have the address where we are putting the next body part which is $v0
+    sb $v0, 0($t0)
+    
+    # After placing the new body segment down we must increment the snake's length
+    j increment_snake_length
+    
+    
+    place_new_tail_left:
+    # Check the left space of the tail before placing
+    # Subtract one from col, the row is the same
+    addi $t0, $s3, -1
+    
+    # Prepare to call get_slot
+    move $a0, $s0 # The game struct
+    move $a1, $s2 # The row we checking
+    move $a2, $t0 # The col we checking
+    
+    # Call it 
+    jal get_slot
+    
+    # In $v0 we have the character that is returned
+    # if it is '.' then we can put it there else -1 since it is not a free space
+    li $t7, '.'
+    
+    # If the placement is not a '.' we can't put the new tail there
+    bne $v0, $t7, unable_to_place_tail_in_direction
+    
+    # However if it is a '.' then we can put it there
+    # We need the current tail's character so we can increment it for the next tail
+    move $a0, $s0 # The game struct
+    move $a1, $s2 # The row we checking
+    move $a2, $s3 # The col we checking
+    
+    jal get_slot
+    
+    # Now if the current tail is a '9' then we have to do a ascii jump to 'A'
+    li $t7, '9'   
+    beq $v0, $t7, ascii_jump_for_snake_left
+    
+    # If not equal to '9' then we just have to increment it like normal
+    addi $v0, $v0, 1
+    
+    # Then we have to actually place the new tail down in that direction
+    j actual_placement_left
+    
+    ascii_jump_for_snake_left:
+    li $v0, 'A'
+    
+    actual_placement_left:
+    # We will putting the snake in the place that is down of the tail using the formula
+    # effect_addr = base_addr + element_size_in_byte ( i * num_columns + j)
+    lb $t0, 1($s0) # Getting the number of columns of the game grid
+    
+    # Multiply the column with the row and store into $t0
+    mul $t0, $t0, $s2
+    
+    # Then we add j which is just the col
+    add $t0, $t0, $s3
+    
+    # But have to subtract one for the previous column
+    addi $t0, $t0, -1
+    
+    # Get the base_address into $t1
+    addi $t1, $s0, 5
+    
+    # Add it with $t0 to get the effective address
+    add $t0, $t0, $t1
+    
+    # Now in $t0 we have the address where we are putting the next body part which is $v0
+    sb $v0, 0($t0)
+    
+    # We can just follow logically for the incrementation of the snake length
+    
+    increment_snake_length:
+    # If we are here then the new tail is already placed, we must add to the snake's
+    # length in the game struct and return it as the output
+    lb $t0, 4($s0) # Get's the current body length
+    
+    # Increment the body length by one
+    addi $t0, $t0, 1
+    
+    # Updates it in the game struct
+    sb $t0, 4($s0)
+    
+    # Return it as our return value
+    move $v0, $t0
+    
+    # Then we are effectively finished with the algorithm
+    j finished_add_tail_algorithm
+    
+    invalid_body_length:
+    # If we are here then that means the body length is not valid hence we load in -1
+    # into the output and return from this function
+    li $v0, -1
+    
+    j finished_add_tail_algorithm
+    
+    unable_to_place_tail_in_direction:
+    # If we are here then from the direction that we checked it is either a
+    # body segment that is there or a wall or outer bound hence we cannot put a tail there
+    # therefore return -1
+    li $v0, -1
+    
+    # Then just finished the algoirthm logically
+
+    finished_add_tail_algorithm:
+    # If we are here then we are done with the algorithm hence we can start
+    # restoring the registers and deallocating the memory that we have used
+    lw $s0, 0($sp) # Restoring $s0 register
+    lw $s1, 4($sp) # Restoring $s1 register
+    lw $s2, 8($sp) # Restoring $s2 register
+    lw $s3, 12($sp) # Restoring $s3 register
+    
+    # Restoring the return address else it won't know here to return to
+    lw $ra, 16($sp)
+    
+    # Deallocating the 20 byte of memory that we have used
+    addi $sp, $sp, 20
+    
+    # Then we can return to the main
     jr $ra
 
 increase_snake_length:
+    # 
+    
+
+
     jr $ra
 
 move_snake:

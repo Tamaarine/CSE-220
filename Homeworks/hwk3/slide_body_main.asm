@@ -212,6 +212,26 @@ li $v0, 11
 syscall
 
 la $t0, state
+addi $t0, $t0, 2
+lb $a0, 0($t0)
+li $v0, 1
+syscall
+
+li $a0, '\n'
+li $v0, 11
+syscall
+
+la $t0, state
+addi $t0, $t0, 3
+lb $a0, 0($t0)
+li $v0, 1
+syscall
+
+li $a0, '\n'
+li $v0, 11
+syscall
+
+la $t0, state
 addi $t0, $t0, 5
 move $a0, $t0
 li $v0, 4
