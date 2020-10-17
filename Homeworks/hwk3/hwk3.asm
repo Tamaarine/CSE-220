@@ -771,9 +771,9 @@ find_next_body_part:
     
     # Saving the arguments
     move $s0, $a0 # $s0 have the game struct address
-    move $s1, $s1 # $s1 have the row that we are searching from
-    move $s2, $s2 # $s2 have the column that we are searching from
-    move $s3, $s3 # $s3 have the target_part that we are looking for
+    move $s1, $a1 # $s1 have the row that we are searching from
+    move $s2, $a2 # $s2 have the column that we are searching from
+    move $s3, $a3 # $s3 have the target_part that we are looking for
     
     # First things first we have to make sure that the given row and column arguments
     # from where we are looking from are valid hence let's grab the game row and column from the struct
@@ -798,18 +798,454 @@ find_next_body_part:
     # If the column's valid is >= to the game's column then it can't be valid
     bge $s2, $t1, invalid_row_col_argument_part3
     
+    # effect_addr = base_addr + element_size_in_byte ( i * num_columns + j)
+    # This formula will be used to calculate the effect address of that specific four square
     # Okay if we are here the given row and column argument are both valid hence we
     # start performing the checking
     
+    # Up square first
+    # where the row is obtained by subtracting 1 but the column remains the same
+    # We will store the possible location row in $t0, possible location col in $t1
+    addi $t0, $s1, -1 # Subtracting 1 from given row to get up square's row
+    
+    # Then we can just move in the arguments for get_slot
+    # $a0 -> Game struct
+    # $a1 -> Row
+    # $a2 -> Col
+    move $a0, $s0
+    move $a1, $t0
+    move $a2, $s2 # Same column value
+    
+    # Then we can call get_slot
+    jal get_slot
+    
+    # In $v0 we have the character that is returned that is up of (row, col)
+    # Let's check if it is the target
+    # We take the branch if the target is found in the up square
+    beq $v0, $s3, at_up_body_part_target_found
+    
+    # If we don't take the branch then we check the down square
+    # Down square second 
+    # Row is just adding 1 and the column is the same
+    addi $t0, $s1, 1
+    
+    # Move in the arguments for get_slot
+    # $a0 -> Game struct
+    # $a1 -> Row
+    # $a2 -> Col
+    move $a0, $s0
+    move $a1, $t0
+    move $a2, $s2 # Same column value
+    
+    # Call get_slot
+    jal get_slot
+    
+    # If $v0 is equal to target then the target is found at down square
+    beq $v0, $s3, at_down_body_part_target_found
+    
+    # If we don't branch we check left square
+    # Row is the same, but the column is subtracted by 1
+    addi $t0, $s2, -1
+    
+    # Move in the argument for get_slot
+    # $a0 -> Game struct
+    # $a1 -> Row
+    # $a2 -> Col
+    move $a0, $s0
+    move $a1, $s1 # Same as row value
+    move $a2, $t0
+    
+    # Call get_slot
+    jal get_slot
+    
+    # If $v0 is equal to target then target is found at left square
+    beq $v0, $s3, at_left_body_part_target_found
+    
+    # If we don't branch the check right last square
+    # Row is the same, column add by 1
+    addi $t0, $s2, 1
+    
+    # Move in argument
+    # $a0 -> Game struct
+    # $a1 -> Row
+    # $a2 -> Col
+    move $a0, $s0
+    move $a1, $s1 # Same as row value
+    move $a2, $t0
+    
+    # Call get_slot
+    jal get_slot
+    
+    # If $v0 is equal to target then target is found at right square
+    beq $v0, $s3, at_right_body_part_target_found
+    
+    # Now we come here, if we are here then the target cannot be found in any of the 4 squares
+    # hence we return -1 and -1 for both output value
+    # We can do so by jumping to invalid_row_col_argument_part3
+    j invalid_row_col_argument_part3
+    
+    at_up_body_part_target_found:
+    # At the up square the target is found hence we make $v0 the return value
+    # to row - 1, and $v1 the just col
+    addi $v0, $s1, -1 # The row is just given row - 1
+    move $v1, $s2 # The column is the same 
+    
+    # We are then done and can return
+    j finished_find_next_body_part_algorithm
+    
+    at_down_body_part_target_found:
+    # At the down square the target is found hence we make $v0 the return value
+    # to row + 1, and $v1 is just the col
+    addi $v0, $s1, 1 # The row is given row + 1
+    move $v1, $s2 # The column is the same
+    
+    # We are then done and can return
+    j finished_find_next_body_part_algorithm
+    
+    at_left_body_part_target_found:
+    # At the left square the target is found hence we make $v0 the return value
+    # to just row, and $v1 is col - 1
+    move $v0, $s1 # The row is the same
+    addi $v1, $s2, -1 # The col is given col - 1
+    
+    # We are then done and can return
+    j finished_find_next_body_part_algorithm
+    
+    at_right_body_part_target_found:
+    # At the right square the taget is found hence we make $v0 the return value
+    # of jsut row, and $v1 is col + 1
+    move $v0, $s1 # The row is the same
+    addi $v1, $s2, 1 # The col is given col + 1
+    
+    # We are then done and can return. Can't follow else it will be logic error
+    j finished_find_next_body_part_algorithm
     
     invalid_row_col_argument_part3:
+    # If we are here then that means the the row and col given
+    # if not valid hence we return -1 in both $v0 and $v1
+    li $v0, -1
+    li $v1, -1
     
+    finished_find_next_body_part_algorithm:
+    # If we are here then that means that we have finished executing this algorithm
+    # We can restore all the registsers and the memory that we have used
+    
+    # Restoring the registers
+    lw $s0, 0($sp) # Restoring $s0 register
+    lw $s1, 4($sp) # Restoring $s1 register
+    lw $s2, 8($sp) # Restoring $s2 register
+    lw $s3, 12($sp) # Restoring $s3 register
+    
+    # Restoring the return address
+    lw $ra, 16($sp) # Restoring the return address
     
     # Deallocating the memory that we have used
- 
+    addi $sp, $sp, 20 
+    
+    # Then we can jump back to main
     jr $ra
 
 slide_body:
+    # This function moves the snake in a direction that is given as argument
+    # (1,0) = Move down a row
+    # (-1,0) = Move up a row
+    # (0,1) = Move right a col
+    # (0,-1) = Move left a col
+    # We have to update the struct's snake head_row and col after we finished moving
+    
+    # $a0 -> The valid game_struct
+    # $a1 -> The delta head_row, how much we are changing the row
+    # $a2 -> The delta head_col, how much we are changing the col
+    # $a3 -> The apple's array which contains the pair of values
+    # 0($sp) -> Accessing from the stack that contains the caller's stack frame for the
+    # fifth argument which is the apple_length
+    # Output -> $v0, 0 if the snake move into empty slot '.'
+    # 1 if the snake move into a slot that have an apple and move forwaard without any trouble
+    # -1 if the snake can't move forward because if so it moves outside gameboard, intersect itself
+    # or intersect a wall with no change to the game struct
+    
+    # Save a copy of the $sp before we allocate so we can grab the argument from the caller
+    # easily in $t0
+    move $t0, $sp
+    
+    # First and foremost let's save all the 8 $s registers because we are going to be needing
+    # all of them as well as space for the $ra, making it 36 byte in total
+    addi $sp, $sp, -36 # Allocating 36 byte in the run time stack
+    
+    sw $s0, 0($sp) # Saving register $s0
+    sw $s1, 4($sp) # Saving register $s1
+    sw $s2, 8($sp) # Saving register $s2
+    sw $s3, 12($sp) # Saving register $s3
+    sw $s4, 16($sp) # Saving register $s4
+    sw $s5, 20($sp) # Saving register $s5
+    sw $s6, 24($sp) # Saving register $s6
+    sw $s7, 28($sp) # Saving register $s7
+    
+    sw $ra, 32($sp) # Saving the return address
+    
+    # Then we can store the arguments now
+    move $s0, $a0 # Storing the game struct
+    move $s1, $a1 # Storing the delta row
+    move $s2, $a2 # Storing the delta col
+    move $s3, $a3 # Storing the apple array address
+    lb $s4, 0($t0) # Storing the apple length
+    
+    # Now we have to first see if the place that the snake is moving to is a
+    # valid place to go to by calling get_slot in the future position of the snake
+    # We will proceed to calculate the future row and future col of the snake using the snake's
+    # current head and row position adding it to the delta row and delta col and calling get_slot
+    # Future row will be in $t0, future col will be in $t1
+    # Load snake's head from game_struct first
+    lb $t0, 2($s0) # Getting the head row
+    lb $t1, 3($s0) # Getting the head col
+    
+    # Now adding the delta row and delta col
+    add $t0, $t0, $s1 # Delta row
+    add $t1, $t1, $s2 # Delta col
+    
+    # Then we have to call get_slot to check whether or not the snake can move into that
+    # position
+    move $a0, $s0 # Game struct
+    move $a1, $t0 # Row to check
+    move $a2, $t1 # Col to check
+    
+    # Calling get_slot
+    jal get_slot
+    
+    # In $v0 we have the future snake's position's character
+    # Now we will only break the difference cases where the snake can move into
+    
+    # We need a place to store the true or false value of whether or not the snake moved
+    # into an apple and eat it without trouble or into a '.' space
+    # We will allocate it in the run time stack using additional of 4 byte and we will deallocate
+    # it right after we finished the for loop
+    addi $sp, $sp, -4 # Allocating 4 more byte to store the true or false value of the boolean
+    
+    # We will only one byte one at 0($sp) with inital value of 0 to signal that
+    # it hasn't eaten an apple until found
+    sb $0, 0($sp) 
+    
+    # First case is if it can enter a free slot
+    li $t7, '.'
+    
+    beq $v0, $t7, move_into_free_slot_snake
+    
+    # Second case is the apple slot
+    li $t7, 'a'
+    
+    beq $v0, $t7, move_into_apple_slot_snake
+    
+    # Now if we are here then the position that the snake is about to move into is
+    # either a wall, the snake body itself, or outside of the gamebaord
+    # We will just return -1 as the unable to move value without changing any game state
+    li $v0, -1 
+    
+    # Then we just have to return that's it nothing to do if we are unable to move into a position
+    j finished_sliding_algorithm
+    
+    move_into_apple_slot_snake:
+    # If there is an apple in front it is a special case
+    # We have to update 0($sp) to be 1 because an apple is found
+    li $t7, 1
+    
+    sb $t7, 0($sp)
+    
+    # Then we must call place_next_apple to put the next apple
+    # before making the snake 'eat' the apple
+    move $a0, $s0 # The game struct argument
+    move $a1, $s3 # The apple array
+    move $a2, $s4 # The apple_length 
+    
+    # Now we have everything we can just call place_next_apple
+    jal place_next_apple
+    
+    # After putting the next apple we can make the snake move forward into that apple
+    # which just follows the next label logically
+    
+    move_into_free_slot_snake:
+    # Now if we are here then that means the next position the snake is going to be moving into
+    # is just a free slot, we can do so without worries
+    # So we comptue the future row and future columns again so we can call set_slot on the game
+    # struct to update the head of the snake first 
+    lb $t0, 2($s0) # Getting the head row
+    lb $t1, 3($s0) # Getting the head col
+    
+    # Now adding the delta row and delta col
+    add $t0, $t0, $s1 # Delta row
+    add $t1, $t1, $s2 # Delta col
+    
+    # Only the head we are moving using set_slot for now
+    li $t7, '1'
+    move $a0, $s0 # Game struct
+    move $a1, $t0 # The row we are placing 1 into
+    move $a2, $t1 # The col we are placing 1 into
+    move $a3, $t7 # The character we are placing at the future row and col
+    
+    # Now we can call set_slot
+    jal set_slot
+    
+    # So after the 1 is set in the future row and col we will be using a for loop
+    # to move all the body segements starting from original head row, col 
+    # to find the next body segement which is 2, and move it into current head row, col
+    # then update the 
+    
+    # So after the 1 is set in the future row and col we will be using a for loop
+    # to do all the moving. Let's define some variables first
+    # We call working_row and working_col as the current row, col starting.
+    # It will be initally head's row, col. Then it will look for the next body segement starting with 2
+    # at working_row and working_col. If it finds 2 by calling find_next_body_part
+    # It will update the body part working_row, working_col current at with 2 and update
+    # the value to the 2's row and col and increment to find the next body segement which is 3.
+    # Then it will just basically keep doing that until it hits a current_row and working_col where
+    # the next body segment it returns is -1 which means there that it has finished incrementing all the bodies
+    # The last step is to make the cell at working_row and working_col into an empty slot and that's it
+    
+    # So working_row will be $s5
+    # Working_col will be $s6
+    lb $s5, 2($s0) # Starting at head_row
+    lb $s6, 3($s0) # Starting at head_col
+    
+    # We will need a body segment counter and will be in $s7
+    li $s7, '2' # Starting at 2 since that is the next body segment we looking for
+    
+    for_loop_for_sliding_the_snake:
+    	# So here is our stopping condition
+    	# After we called find_next_body_part, if a -1 is returned in $v0 or $v1 we will
+    	# exit the loop because that means the next body segment is not found at working_row
+    	# and working_col
+    	move $a0, $s0 # Game struct
+    	move $a1, $s5 # The row we searching from will just be working_row
+    	move $a2, $s6 # The col we searching from will just be working_col
+    	move $a3, $s7 # Target will be the body segement counter
+    	
+    	# Then we can call find_next_body_part
+    	jal find_next_body_part
+    	
+    	# And in $v0, $v1 we have our next_body part's position
+	# Store it in $t0 and $t1 first
+	move $t0, $v0 # Next part row
+	move $t1, $v1 # Next part col
+	
+	# We have to make sure that the next_body part exists before we start replacing
+	# Which is also our stopping condition, that if we can't find the next body segment
+	# we are done moving the body parts
+	li $t7, -1
+	
+	# We will branch if the next body part doesn't exist
+	beq $t0, $t7, finished_loop_for_sliding_the_snake
+	
+	# If we are here then that means the next body part does exist and we have to
+	# replace the character at (working_row, working_col) with $s7
+	# then update working_row and working_col to $t0 and $t1
+    	# effect_addr = base_addr + element_size_in_byte ( i * num_columns + j)
+	
+	# Get the base address for the game_board
+	addi $t5, $s0, 5
+	
+	# Get number of columns first
+	lb $t2, 1($s0)
+	
+	# i * num_columns first into $t4
+	mul $t4, $s5, $t2
+	# Then plus j
+	add $t4, $t4, $s6
+	
+	# Add to base address to get effective address
+	add $t4, $t4, $t5
+	
+	# Now having the effective address we can replace the (working_row, working_col) with
+	# $s7 which is the body segment we are looked for
+	sb $s7, 0($t4)
+	
+	# Okay after we replace it we have to replace working_row and working_col with
+	# the body segment row and col we just found
+	move $s5, $t0
+	move $s6, $t1
+	
+	# Then we have to increment $s7 to point to the next body segment we looking for
+	# but we have to keep in mind when $s7 is '9' we have to jump to 'A'
+	li $t7, '9'
+	
+	# If the body segment we just looked at is 9 already we have to turn it into A
+	beq $s7, $t7, apple_ascii_jump
+	
+	# Else we just increment it like normal, even when it turn into A
+	addi $s7, $s7, 1
+	
+	# We have to make sure to skip over it if it is not a 9 after incrementing
+	j after_apple_ascii_jump
+	
+	apple_ascii_jump:
+	# Jumping from 9 to A, only occurs at most once
+	li $s7, 'A'
+	
+	after_apple_ascii_jump:
+	# Then that's it we just have to jump back up the loop
+	j for_loop_for_sliding_the_snake
+	 
+    finished_loop_for_sliding_the_snake:
+    # Then we have to removed the character at (working_row, working_col) into '.'
+    li $t7, '.'
+    
+    # Get the base address for the game_board
+    addi $t0, $s0, 5
+	
+    # Get number of columns first
+    lb $t1, 1($s0)
+	
+    # i * num_columns first into $t2
+    mul $t2, $s5, $t1
+    # Then plus j
+    add $t2, $t2, $s6
+	
+    # Add to base address to get effective address
+    add $t2, $t2, $t0
+    
+    # Then store it into $t2
+    sb $t7, 0($t2)
+    
+    # Then we are essentially done! We will have our result
+    # which did the snake moved into a '.' or 'a' in 0($sp)
+    # so we just have to put it into $v0 as our output value
+    lb $v0, 0($sp)
+    
+    # Then we are essentially done with the algorithm
+    # But before we are done we have to update the new snake head's row and col before we return
+    # Which can be easily obtain by adding both with delta row and col
+    # Load in the current snake head's row and col first, into $t0 and $t1
+    lb $t0, 2($s0) # Head row
+    lb $t1, 3($s0) # Head col
+    
+    # Then we add it with the delta row and delta col
+    add $t0, $t0, $s1
+    add $t1, $t1, $s2 
+    
+    # Then store it back into the struct
+    sb $t0, 2($s0) # Update head row
+    sb $t1, 3($s0) # Update head col
+    
+    # Then we are done
+    
+    finished_sliding_algorithm:
+    # Then we have to deallocate the 4 byte we use to store as a boolean expression
+    addi $sp, $sp, 4
+    
+    # Restoring all the registers
+    lw $s0, 0($sp) # Restoring register $s0
+    lw $s1, 4($sp) # Restoring register $s1
+    lw $s2, 8($sp) # Restoring register $s2
+    lw $s3, 12($sp) # Restoring register $s3
+    lw $s4, 16($sp) # Restoring register $s4
+    lw $s5, 20($sp) # Restoring register $s5
+    lw $s6, 24($sp) # Restoring register $s6
+    lw $s7, 28($sp) # Restoring register $s7
+    
+    lw $ra, 32($sp) # Restoring the return address
+    
+    # Deallocating all the memory we used
+    addi $sp, $sp, 36
+    
+    # Then we can return to main
     jr $ra
 
 add_tail_segment:
