@@ -1,5 +1,5 @@
 .data
-head_row_delta: .byte -1
+head_row_delta: .byte 1
 head_col_delta: .byte 0
 apples: .byte 1 7 3 2 1 4 4 3
 apples_length: .word 4
@@ -9,7 +9,7 @@ state:
 .byte 14  # num_cols
 .byte 4  # head_row
 .byte 5  # head_col
-.byte 15  # length
+.byte 14 # length
 # Game grid:
 .asciiz "....................##......................#..a.....#....#..1234..#..........56...E......##.7..CD.........89AB."
 
@@ -36,171 +36,7 @@ li $t0, 7918273    # putting some random garbage in $t0
 jal slide_body
 addi $sp, $sp, 4
 
-la $a0, state
-li $a1, 0
-li $a2, -1
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
 
-la $a0, state
-li $a1, -1
-li $a2, 0
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, 0
-li $a2, -1
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, 0
-li $a2, -1
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, 0
-li $a2, -1
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, 0
-li $a2, -1
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, 1
-li $a2, 0
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, 1
-li $a2, 0
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, 1
-li $a2, 0
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, 0
-li $a2, 1
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, 0
-li $a2, 1
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, 0
-li $a2, 1
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, -1
-li $a2, 0
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-la $a0, state
-li $a1, -1
-li $a2, 0
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
-
-
-la $a0, state
-li $a1, 1
-li $a2, 0
-la $a3, apples
-addi $sp, $sp, -4
-lw $t0, apples_length
-sw $t0, 0($sp)
-li $t0, 7918273    # putting some random garbage in $t0
-jal slide_body
-addi $sp, $sp, 4
 
 move $t1, $v0
 li $v0, 1

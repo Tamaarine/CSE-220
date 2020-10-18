@@ -1950,6 +1950,377 @@ increase_snake_length:
     jr $ra
 
 move_snake:
+    # This function basically moves the snake through the game_grid in a given direction
+    # by calling the appropriate slide_body function with approproiate direction
+    # There will be different cases depending on the what is returned from slide_body and
+    # increase_snake_length
+    # If slide_body return -1, move_snake return (0,-1)
+    # If slide_body return 1, the snake ate an apple, then move_snake will also call
+    # increase_snake_length to increase the length of the snake in the head's direction
+    # increase_snake_length can be body length so (100,1) is return in move_snake
+    # or -1 so move_snake will return (0,-1)
+    # If slide body return 0, so the snake move successfully into empty slot return (0,1)
+    # If the direction is invalid, move_snake will just return (0,-1)
+    
+    # $a0 -> The valid game struct
+    # $a1 -> The direction that the snake;s head is moving
+    # $a2 -> The apple array
+    # $a3 -> The number of pairs of apple in the apple array
+    # Output -> $v0, The number of points scored must be 0 or 100
+    # Output -> $v1, 1 if increase_snake_length successfully added a new body segment
+    # or if a snake just moved into an empty slot. -1 if increase_snake_length
+    # doesn't add a segment
+    
+    # First let's save these arguments in the $s registers because we will be calling other functions
+    # as well as the return address of this function
+    # 4 arguments, 16 bytes plus 4 for return address
+    # 20 bytes in total
+    addi $sp, $sp, -20 # Allocating 20 bytes in the memory
+    
+    sw $s0, 0($sp) # Storing the $s0 register
+    sw $s1, 4($sp) # Storing the $s1 register
+    sw $s2, 8($sp) # Storing the $s2 register
+    sw $s3, 12($sp) # Storing the $s3 register
+    
+    # Storing the return address
+    sw $ra, 16($sp)
+    
+    # Now we can save the arguments
+    move $s0, $a0 # $s0 have the game struct
+    move $s1, $a1 # $s1 have the direction that the snake is moving
+    move $s2, $a2 # $s2 have the apple array
+    move $s3, $a3 # $s3 have the number pair of apple array
+    
+    # We have to make sure that the direction is valid first 
+    # If it is up then it is valid
+    li $t7, 'U'
+    beq $s1, $t7, slide_snake_up
+    
+    # If it is down it is valid
+    li $t7, 'D'
+    beq $s1, $t7, slide_snake_down
+    
+    # If it is left it is valid
+    li $t7, 'L'
+    beq $s1, $t7, slide_snake_left
+
+    # If it is right it is valid
+    li $t7, 'R'    
+    beq $s1, $t7, slide_snake_right
+    
+    # If we are here then that means the direction argument is invalid
+    # hence we just return (0,-1)
+    li $v0, 0
+    li $v1, -1
+    
+    # We finished then we can just go to that label to deallocate everything
+    j finished_move_snake_algorithm
+    
+    
+    
+    # If we are in any of these labels, the direction are valid we just have to call the
+    # correct slide_body function with the correct arguments
+    slide_snake_up:
+    move $a0, $s0 # The game struct
+    li $a1, -1 # The delta row for moving up
+    li $a2, 0 # The delta col for moving up
+    move $a3, $s2 # The apple array address
+    
+    # The fourth argument must be given in the stack
+    addi $sp, $sp, -4 # Allocating 4 byte onto the stack
+    sw $s3, 0($sp) # Then we can put the length in there
+    
+    # Finally we can call the slide_body function
+    jal slide_body
+    
+    # We must deallocate the 4 byte that we have just used
+    addi $sp, $sp, 4 # Deallocating the 4 byte we just used
+    
+    # In $v0 we have the return value of slide_body
+    # if it is -1 then the snake cannot move in that direction hence move_slide
+    # will return (0,-1)
+    li $t7, -1
+    beq $v0, $t7, unable_to_slide_body
+    
+    # But if we are here then slide_body return 0 or 1 which we have to handle both cases differently
+    li $t7, 1
+    
+    # This is the special case that the snake when sliding up went into an apple
+    beq $v0, $t7, slide_into_apple_up
+    
+    # If we are here then the slide_body returned 0 which means that the snake just moved
+    # into an empty slot so we just have to return (0,1) and no other work is needed
+    li $v0, 0
+    li $v1, 1
+    
+    j finished_move_snake_algorithm
+    
+    slide_into_apple_up:
+    # If we are here then that means that the snake moved into an apple we have to call
+    # increase_snake_length to further determine the value of our function return
+    # Now we have to call increase_snake_length
+    move $a0, $s0 # The game struct
+    move $a1, $s1 # The direction the snake is moving
+    
+    # Then we can call increase_snake_length
+    jal increase_snake_length
+    
+    # And in $v0 it will return the new body length if it is successful
+    # or -1 if it cannot increase the length of the body
+    li $t7, -1 
+    
+    beq $v0, $t7, dont_increase_score_up
+    
+    # But if we are here then that means it was able to increase the snake length successfully
+    # hence we return (100,1)
+    li $v0, 100
+    li $v1, 1
+    
+    # And we are done with the algorithm
+    j finished_move_snake_algorithm
+    
+    dont_increase_score_up:
+    # If the return value of increase_snake_length is -1 then we don't 
+    # increase the score so we just return (0,-1)
+    li $v0, 0
+    li $v1, -1
+    
+    # And we are done with this algorithm
+    j finished_move_snake_algorithm
+    
+    
+    
+    slide_snake_down:    
+    move $a0, $s0 # The game struct
+    li $a1, 1 # The delta row for moving down
+    li $a2, 0 # The delta col for moving down
+    move $a3, $s2 # The apple array address
+    
+    # The fourth argument must be given in the stack
+    addi $sp, $sp, -4 # Allocating 4 byte onto the stack
+    sw $s3, 0($sp) # Then we can put the length in there
+    
+    # Finally we can call the slide_body function
+    jal slide_body
+    
+    # We must deallocate the 4 byte that we have just used
+    addi $sp, $sp, 4 # Deallocating the 4 byte we just used
+    
+    # In $v0 we have the return value of slide_body
+    # if it is -1 then the snake cannot move in that direction hence move_slide
+    # will return (0,-1)
+    li $t7, -1
+    
+    beq $v0, $t7, unable_to_slide_body
+    
+    # But if we are here then slide_body return 0 or 1 which we have to handle both cases differently
+    li $t7, 1
+    
+    # This is the special case that the snake when sliding up went into an apple
+    beq $v0, $t7, slide_into_apple_down
+    
+    # If we are here then the slide_body returned 0 which means that the snake just moved
+    # into an empty slot so we just have to return (0,1) and no other work is needed
+    li $v0, 0
+    li $v1, 1
+    
+    j finished_move_snake_algorithm
+    
+    slide_into_apple_down:
+    # If we are here then the snake moved into an apple hence we have to
+    # call increase_snake_length to determine which value we return
+    move $a0, $s0 # The game struct
+    move $a1, $s1 # The direction the snake is moving
+    
+    # Calling increase_snake_length
+    jal increase_snake_length
+    
+    # And in $v0 it will return the new body length if it is successful
+    # or -1 if it cannot increase the length of the body
+    li $t7, -1 
+    
+    beq $v0, $t7, dont_increase_score_down
+    
+    # But if we are here then that means it was able to increase the snake length successfully
+    # hence we return (100,1)
+    li $v0, 100
+    li $v1, 1
+    
+    # And we are done with the algorithm
+    j finished_move_snake_algorithm
+    
+    dont_increase_score_down:
+    # If the return value of increase_snake_length is -1 then we don't 
+    # increase the score so we just return (0,-1)
+    li $v0, 0
+    li $v1, -1
+    
+    # And we are done with this algorithm
+    j finished_move_snake_algorithm
+    
+    
+    
+    slide_snake_left:
+    move $a0, $s0 # The game struct
+    li $a1, 0 # The delta row for moving left
+    li $a2, -1 # The delta col for moving left
+    move $a3, $s2 # The apple array address
+    
+    # The fourth argument must be given in the stack
+    addi $sp, $sp, -4 # Allocating 4 byte onto the stack
+    sw $s3, 0($sp) # Then we can put the length in there
+    
+    # Finally we can call the slide_body function
+    jal slide_body
+    
+    # We must deallocate the 4 byte that we have just used
+    addi $sp, $sp, 4 # Deallocating the 4 byte we just used
+    
+    # In $v0 we have the return value of slide_body
+    # if it is -1 then the snake cannot move in that direction hence move_slide
+    # will return (0,-1)
+    li $t7, -1
+    
+    beq $v0, $t7, unable_to_slide_body
+    
+    # But if we are here then slide_body return 0 or 1 which we have to handle both cases differently
+    li $t7, 1
+    
+    # This is the special case that the snake when sliding up went into an apple
+    beq $v0, $t7, slide_into_apple_left
+    
+    # If we are here then the slide_body returned 0 which means that the snake just moved
+    # into an empty slot so we just have to return (0,1) and no other work is needed
+    li $v0, 0
+    li $v1, 1
+    
+    j finished_move_snake_algorithm
+    
+    slide_into_apple_left:
+    # If we are here then snake into apple we have to call increase_snake_length
+    move $a0, $s0 # The game struct
+    move $a1, $s1 # The direction of where the snake is moving
+    
+    # Calling the function
+    jal increase_snake_length
+    
+    # And in $v0 it will return the new body length if it is successful
+    # or -1 if it cannot increase the length of the body
+    li $t7, -1 
+    
+    beq $v0, $t7, dont_increase_score_left
+    
+    # But if we are here then that means it was able to increase the snake length successfully
+    # hence we return (100,1)
+    li $v0, 100
+    li $v1, 1
+    
+    # And we are done with the algorithm
+    j finished_move_snake_algorithm
+    
+    dont_increase_score_left:
+    # If the return value of increase_snake_length is -1 then we don't 
+    # increase the score so we just return (0,-1)
+    li $v0, 0
+    li $v1, -1
+    
+    # And we are done with this algorithm
+    j finished_move_snake_algorithm
+    
+    
+    
+    slide_snake_right:
+    move $a0, $s0 # The game struct
+    li $a1, 0 # The delta row for moving right
+    li $a2, 1 # The delta col for moving right
+    move $a3, $s2 # The apple array address
+    
+    # The fourth argument must be given in the stack
+    addi $sp, $sp, -4 # Allocating 4 byte onto the stack
+    sw $s3, 0($sp) # Then we can put the length in there
+    
+    # Finally we can call the slide_body function
+    jal slide_body
+    
+    # We must deallocate the 4 byte that we have just used
+    addi $sp, $sp, 4 # Deallocating the 4 byte we just used
+    
+    # In $v0 we have the return value of slide_body
+    # if it is -1 then the snake cannot move in that direction hence move_slide
+    # will return (0,-1)
+    li $t7, -1
+    
+    beq $v0, $t7, unable_to_slide_body
+    
+    # But if we are here then slide_body return 0 or 1 which we have to handle both cases differently
+    li $t7, 1
+    
+    # This is the special case that the snake when sliding up went into an apple
+    beq $v0, $t7, slide_into_apple_right
+    
+    # If we are here then the slide_body returned 0 which means that the snake just moved
+    # into an empty slot so we just have to return (0,1) and no other work is needed
+    li $v0, 0
+    li $v1, 1
+    
+    j finished_move_snake_algorithm
+    
+    slide_into_apple_right:
+    # If we are here then the snake slide into an apple then we have to call
+    # increase_snake_length
+    move $a0, $s0 # The game struct
+    move $a1, $s1 # The direction of the snake
+    
+    # Calling the function
+    jal increase_snake_length
+    
+    # And in $v0 it will return the new body length if it is successful
+    # or -1 if it cannot increase the length of the body
+    li $t7, -1 
+    
+    beq $v0, $t7, dont_increase_score_right
+    
+    # But if we are here then that means it was able to increase the snake length successfully
+    # hence we return (100,1)
+    li $v0, 100
+    li $v1, 1
+    
+    # And we are done with the algorithm
+    j finished_move_snake_algorithm
+    
+    dont_increase_score_right:
+    # If the return value of increase_snake_length is -1 then we don't 
+    # increase the score so we just return (0,-1)
+    li $v0, 0
+    li $v1, -1
+    
+    # And we are done with this algorithm
+    j finished_move_snake_algorithm
+
+    
+    
+    unable_to_slide_body:
+    # If we are here then that means that the snake is unable to move its body in the given direction
+    # when calling slide_body hence we just return (0,-1)
+    li $v0, 0
+    li $v1, -1 
+
+    # Then we can just follow this next logically line for finishing up
+
+    finished_move_snake_algorithm:
+    # If we are here then we can start restoring all the $s registers
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    lw $s2, 8($sp) # Restoring the $s2 register
+    lw $s3, 12($sp) # Restoring the $s3 register
+
+    # Restoring the return address of move_snake
+    lw $ra, 16($sp)
+    
+    # Deallocating the 20 bytes of memory that we used
+    addi $sp, $sp, 20
+
+    # Then we can return to the main
     jr $ra
 
 simulate_game:
