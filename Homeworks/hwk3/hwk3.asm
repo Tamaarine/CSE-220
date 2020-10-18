@@ -1662,10 +1662,291 @@ add_tail_segment:
     jr $ra
 
 increase_snake_length:
-    # 
+    # This function basically calls find_next_body_part iteratively to find the tail of the snake
+    # then it uses add_tail_segment to add a new tail to the oppsite direction of where the 
+    # snale's head is moving. However, if the first attempt is not successful it will try the
+    # next direction to add the tial in a counterclock wise fashion. So if R doesn't work,
+    # it will go to U, then L, then D
     
+    # $a0 -> The valid game struct
+    # $a1 -> Direction of where the snake's head is moving must be make sure it is a valid direction
+    # Output -> $v0, if a new tail is added then return the game_struct's length else it will return -1 if
+    # you can't add the new tail or the direction is invalid
+    
+    # We don't have to worry about updating the length of the snake after we added the new tail
+    # because the method add_tail_segment will handle it for us
+    # So first things first let's save those two arguments into the $s registers 
+    # because we will be making functions calls inside increase_snake_length
+    # Two arguments makes 8 bytes, plus the another 4 byte for the return address
+    # hence a total of 12 bytes. We also need 4 more $s registers hence 16 more bytes
+    addi $sp, $sp, -28 # Allocating 28 bytes on the run time stack
+    
+    # Saving the $s registers before we can use them
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    sw $s2, 8($sp) # Saving the $s2 register
+    sw $s3, 12($sp) # Saving the $s3 register
+    sw $s4, 16($sp) # Saving the $s4 register
+    sw $s5, 20($sp) # Saving the $s5 register
+    
+    # Saving the return address
+    sw $ra, 24($sp)
+    
+    # Now we can save the arguments
+    move $s0, $a0 # $s0 have the game struct
+    move $s1, $a1 # $s1 have the direction of where the snake's head is moving
+    
+    # Now before we can start adding the snake's tail we have to make sure the given
+    # direction is valid, else we don't do any work at all
+    
+    # This means that the direction is up
+    li $t7, 'U'
+    beq $s1, $t7, valid_direction_argument_part2
+    
+    # This means that the direction is down
+    li $t7, 'D'
+    beq $s1, $t7, valid_direction_argument_part2
+
+    # This means that the direction is left    
+    li $t7, 'L'
+    beq $s1, $t7, valid_direction_argument_part2
+
+    # This means that the direction is right    
+    li $t7, 'R'
+    beq $s1, $t7, valid_direction_argument_part2
+    
+    # However, if we are here then that means the given direction is invalid
+    # Hence we just return -1 we don't have to do any work
+    li $v0, -1 # Load -1 as our return value
+    
+    j finished_increase_snake_length_algorithm
+    
+    valid_direction_argument_part2:
+    # So if the given direction is valid then we have to find the snake's tail which can be done through
+    # find_next_body_part just like how we did it in slide_body
+    # We will be keeping a working_row, and a workig_col, and a body segment counter
+    # in $s2, $s3, and $s4 respectively 
+    # Working_row and working_col will be the snake's head initially
+    lb $s2, 2($s0) # $s2 will be the working_row
+    lb $s3, 3($s0) # $s3 will be the working_col
+    
+    # Then the body segment counter will start at '2' because 1 is already accounted for
+    li $s4, '2'
+    
+    # This for loop will be responsible for finding the tail of the snake
+    for_loop_for_finding_tail:
+        # We will have to call find_next_body_part
+        move $a0, $s0 # The game_struct
+        move $a1, $s2 # The working_row
+        move $a2, $s3 # The working_col
+        move $a3, $s4 # The body segment counter will be the target_part
+        
+        # Now we can finally call the method
+        jal find_next_body_part
+        
+        # Okay in $v0 and $v1 we have the row and col of the target_part we will be
+        # checking if it is -1 first to signal that oh it is the tail of the snake
+        # $t7 will be our value comparsion register
+        li $t7, -1
+        
+        # This is our exiting condition, if the return row and col from find_next_body_part
+        # is -1 then that means the working_row and working_col have our tail coordinates 
+        beq $v0, $t7, tail_is_found
+        
+        # If we are here then the next body segment is found so we have to keep searching for
+        # the next body segment by incrementing the body segment counter and update our
+        # working_row and working_col
+        move $s2, $v0 # Update working_row to the row that we just got
+        move $s3, $v1 # Updating working_col to the col that we just got 
+        
+        # Now we also have to update the body segment counter that we got
+        li $t7, '9'
+        
+        # Now if the body segment is at '9' we have to do a ascii jump from '9' to 'A'
+        beq $s4, $t7, ascii_jump_for_increase_snake_length
+        
+        # If the body segment is not '9' then we can just increment it
+        addi $s4, $s4, 1
+        
+        # Then keep in mind we should jump it across the ascii jump to avoid logical errors
+        j after_increase_snake_length_ascii_jump
+        
+        ascii_jump_for_increase_snake_length:
+        # We update body segment counter to 'A'
+        li $s4, 'A'
+        
+        after_increase_snake_length_ascii_jump:
+        # We handled the working_row, working_col update and the body segment
+        # now we can jump back up
+        j for_loop_for_finding_tail
+    
+    tail_is_found:
+    # If we are here then $s2 and $s3 have our tail coordinate of the snake
+    # After the tail is found we now begin the process of trying to add a tail segment
+    # to the opposite direction of where the snake is moving
+    # We will keep a counter the number of times that the function have looked in each direction
+    # going through it counter-clockwise, when it go through four times and still not found
+    # then we know that we cannot add the tail segment, that counter will be in $s5
+    # $s4 have the tail segment that we are adding 
+    li $s5, 0 # Our times counter for the number of times we try each direction
+    
+    # Snake's direction is down we will head to up to check if we can place the snake's tail first
+    li $t7, 'D'
+    beq $s1, $t7, check_up_for_snake_placement
+
+    # Snake's direction is up we will check if we can put the snake's tail at up first 
+    li $t7, 'U'
+    beq $s1, $t7, check_down_for_snake_placement
+
+    # Snake's direction is right we will check if we can put the snake's tail at left first    
+    li $t7, 'R'
+    beq $s1, $t7, check_left_for_snake_placement
+
+    # Snake's direction si left we will check if we can put the snake's tail at right first
+    li $t7, 'L'
+    beq $s1, $t7, check_right_for_snake_placement
 
 
+    check_up_for_snake_placement:
+    # If we are here then we will first check whether or not the $s5 counter reached 4 yet
+    li $t7, 4
+    bge $s5, $t7, no_available_position_is_found
+    
+    # If the counter isn't 4 yet then we can check whether or not we can put the snake's tail
+    # at the up position which we will be doing by calling add_tail_segment
+    move $a0, $s0 # The game struct
+    li $a1, 'U' # The direction that we are putting the new tail segment
+    move $a2, $s2 # The tail's row in $s2
+    move $a3, $s3 # The tail's col in $s3
+    
+    # Then we can call add_tail_segment
+    jal add_tail_segment
+    
+    # After calling add_tail_segment $v0 have the new length if the adding tail is successful
+    # or -1 if it cannot add the new tail
+    li $t7, -1
+    
+    # We increment the counter before we check whether or not the addition of the new tail is success
+    addi $s5, $s5, 1
+    
+    # Then we check whether or not we have successfuly added a new tail, we branch
+    # if we couldn't and go to the next counter-clockwise position which is left
+    beq $v0, $t7, check_left_for_snake_placement
+    
+    # If we are here then the addition of the new tail is successful, we can just return the same
+    # $v0 because that is the new length that is updated from calling add_tail_segment
+    # We are finished with out algorithm then
+    j finished_increase_snake_length_algorithm
+    
+    check_down_for_snake_placement:
+    # If we are here we first check $s5 counter before going into the algorithm
+    li $t7, 4
+    bge $s5, $t7, no_available_position_is_found
+    
+    # The counter hasn't been 4 yet then we can check whether or not we can put the snake's tail at the down position
+    move $a0, $s0 # The game struct
+    li $a1, 'D' # The direction that we are putting the new tail segment
+    move $a2, $s2 # The tail's row in $s2
+    move $a3, $s3 # The tail's col in $s3
+    
+    # Then calling add_tail_segment
+    jal add_tail_segment
+    
+    # After calling $v0 have the new snake length or -1
+    li $t7, -1
+    
+    # We increment the counter before we do any checking
+    addi $s5, $s5, 1
+    
+    # Then we can check whether or notwe have added the new tail
+    # we branch to the next counter-clockwise position if the new length is not updated
+    beq $v0, $t7, check_right_for_snake_placement
+    
+    # However, if we are here  then that means the new tail is added successfully we can return the same
+    # $v0 because that is the new length updated from calling add_tail_segment
+    # We don't even have to do any moving
+    j finished_increase_snake_length_algorithm
+    
+    check_left_for_snake_placement:
+    # If we are here first check $s5 counter before going into the algorithm
+    li $t7, 4
+    bge $s5, $t7, no_available_position_is_found
+    
+    # The counter hasn't been 4 yet then we can check whether or not we can put the snake's tail at the down position
+    move $a0, $s0 # The game struct
+    li $a1, 'L' # The direction that we are putting the new tail segment
+    move $a2, $s2 # The tail's row in $s2
+    move $a3, $s3 # The tail's col in $s3
+    
+    # Then calling add_tail_segment
+    jal add_tail_segment
+    
+    # After calling $v0 have the new snake length or -1
+    li $t7, -1
+    
+    # We increment the counter before we do any checking
+    addi $s5, $s5, 1
+    
+    # Then we can check if $v0 is a new length or -1 which indicate that the new tail
+    # is unable to be added successfully
+    beq $v0, $t7, check_down_for_snake_placement
+    
+    # Then if we are here then that means a new tail is successfully placed hence we can just return
+    # the same $v0 because that is what the function needs
+    j finished_increase_snake_length_algorithm
+    
+    check_right_for_snake_placement:
+    # First check the counter if it is less than 4 before doing it
+    li $t7, 4
+    bge $s5, $t7, no_available_position_is_found
+    
+    # The counter hasn't been 4 yet then we can check whether or not we can put the snake's tail at the down position
+    move $a0, $s0 # The game struct
+    li $a1, 'R' # The direction that we are putting the new tail segment
+    move $a2, $s2 # The tail's row in $s2
+    move $a3, $s3 # The tail's col in $s3
+    
+    # Then calling add_tail_segment
+    jal add_tail_segment
+    
+    # After calling $v0 have the new snake length or -1
+    li $t7, -1
+    
+    # We increment the counter before we do any checking
+    addi $s5, $s5, 1
+    
+    # We can check whether or not a new tail segment is added
+    beq $v0, $t7, check_up_for_snake_placement
+    
+    # If we are here then that means the new tail segment is successfully placed
+    # we are done with the algorithm
+    j finished_increase_snake_length_algorithm
+    
+    
+    no_available_position_is_found:
+    # If we are here then we went through all the possible 4 directions that we can put the
+    # snake's tail and to no avail we can put it anywhere hence we just return -1
+    li $v0, -1
+    
+    # Follows logically to the next line
+    
+    finished_increase_snake_length_algorithm:
+    # If we are here then we are done with this function hence we can start
+    # restoring the $s registers
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    lw $s2, 8($sp) # Restoring the $s2 register
+    lw $s3, 12($sp) # Restoring the $s3 register
+    lw $s4, 16($sp) # Restoring the $s4 register
+    lw $s5, 20($sp) # Restoring the $s5 register
+    
+    # Also restoring the return address
+    lw $ra, 24($sp)
+    
+    # Then we can deallocate the memory that we have used
+    addi $sp, $sp, 28
+    
+    # And finally return to main
     jr $ra
 
 move_snake:

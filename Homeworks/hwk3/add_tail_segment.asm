@@ -1,6 +1,6 @@
 .data
-direction: .byte '['
-tail_row: .byte 0
+direction: .byte 'D'
+tail_row: .byte 1
 tail_col: .byte 9
 .align 2
 state:
@@ -8,13 +8,21 @@ state:
 .byte 12  # num_cols
 .byte 1  # head_row
 .byte 5  # head_col
-.byte 14 # length
+.byte 15 # length
 # Game grid:
-.asciiz ".........ED..a.#.1..#aC....#.2..#.B....#.3..#9A......45678.."
+.asciiz ".........ED..a.#.1..#FC....#.2..#.B....#.3..#9A......45678.."
 
 .text
 .globl main
 main:
+li $s0, 699
+li $s1, 699
+li $s2, 699
+li $s3, 699
+li $s4, 699
+li $s5, 699
+li $s6, 699
+li $s7, 699
 la $a0, state
 lbu $a1, direction
 lb $a2, tail_row
