@@ -2324,6 +2324,217 @@ move_snake:
     jr $ra
 
 simulate_game:
+    # Final function that we will be writing which the main driver for the snake game
+    # We will go through a series of steps in order to properly make the game work
+    
+    # $a0 -> The uninitalized game state that is used to hold the content
+    # that is read from the file
+    # $a1 -> The file name that is going to be open and read
+    # $a2 -> A null terminating String which represent t he direction that the snake is going to be
+    # moved. It is guaranteed to be U,D,L, or R
+    # $a3 -> The number of characters to read from the directions (the number of moves to execute)
+    # 0($sp) -> The apple array's address
+    # 4($sp) -> The number of pairs that is in the apple array
+    
+    # Save a copy of current $sp first for easy access of caller's argument
+    move $t0, $sp
+    
+    # Since we are going to be calling functions let's just save these arguments
+    # into our $s registers
+    # 6 total arguments which means we need 6 $s registers to be used
+    # that will make it into 24 bytes, add another 4 bytes for the return address which will be
+    # total of 28 bytes. Add in another 4 byte for one more $s register to make it 32
+    addi $sp, $sp, -32 # Allocating 32 bytes of memory
+    
+    # Saving the address
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    sw $s2, 8($sp) # Saving the $s2 register
+    sw $s3, 12($sp) # Saving the $s3 register
+    sw $s4, 16($sp) # Saving the $s4 register
+    sw $s5, 20($sp) # Saving the $s5 register
+    sw $s6, 24($sp) # Saving the $s6 register
+    
+    # We also need to save the return address as well
+    sw $ra, 28($sp)
+    
+    # Then we can starting saving the arguments onto the $s registers
+    move $s0, $a0 # $s0 have the uninitalized game struct
+    move $s1, $a1 # $s1 have the file name that is going to be open and read
+    move $s2, $a2 # $s2 have the null terminating string that represent the direction that is going to be used
+    move $s3, $a3 # $s3 have the number of moves to execute, or the number of characters to read from direction
+    lw $s4, 0($t0) # $s4 will have the apple array's address
+    lw $s5, 4($t0) # $s5 will have the number of pairs that is in the apple array
+    
+    # STEP ONE!
+    # We will be calling load_game to initalize the uninitalized struct with the file content
+    move $a0, $s0 # The uninitalized game struct
+    move $a1, $s1 # The file name that is going to be read
+    
+    # Call the function
+    jal load_game
+    
+    # Now in $v0 will have 1 if an apple is found, 0 if not
+    # and in $v0 will have the number of walls that is found in the file
+    # both will be -1 if the file is not found
+    # We will first check if we found the file or not
+    li $t7, -1
+    
+    beq $v0, $t7, simulate_file_didnt_exist    
+    
+    # Now if we are here then that means the file definitely exist
+    # and the game struct is read successfully
+    addi $t7, $s0, 5
+    move $a0, $t7
+    li $v0, 4
+    syscall
+    
+    li $v0, 11
+    li $a0, '\n'
+    syscall
+    
+    # STEP TWO!
+    # We have to check whether or not any apple is found in the file that we just read
+    # in $v0 we have the boolean value of whether or not an apple is found we can just use that for
+    # determine whether or not we should call place_next_apple
+    bne $v0, $0, dont_place_apple
+    
+    # If we are here then that means we must place the next apple because an apple is not
+    # found in the file that is read
+    move $a0, $s0 # The game struct
+    move $a1, $s4 # The apple array
+    move $a2, $s5 # The number of pairs in the apple array
+    
+    # Now everything is set up we can place the apple
+    jal place_next_apple
+    
+    # After we can just follow it logically to the next step without any jumping
+    
+    dont_place_apple:
+    # We are here because an apple is just placed or not placed. Doesn't matter we just have to
+    # handle the case that an apple is not found in the file and just have to place it
+    
+    # STEP THREE
+    # For this step we have to initalize a variable to store the point of the game
+    # we can reuse $s1 because the file is already been read we don't need the file name
+    # any more
+    li $s1, 0
+    
+    # We will be using $s6 to keep track of the total number of moves we have executed
+    li $s6, 0 
+    
+    # STEP FOUR
+    while_loop_for_simulating_game:
+        # This is the for loop that we will be using to play the game by reading
+        # the moves from the directions ($s2)
+        # Here we will be doing the conditions, every of these conditions
+        # Must be satisfied before we can move to move the snake
+        
+        # We are checking the logical oppsoite which is the demorgan of all these conditions
+        # in a or fashions, meaning if any of these condition is false then we exit the while loop
+        
+        # num_moves_to_execute is > 0 must be satisfied
+        ble $s3, $0, finished_while_loop_for_simulating_game    
+        
+        # snake_length is < 35
+        # Getting the snake's length in $t0
+        lb $t0, 4($s0)
+        
+        li $t7, 35
+        bge $t0, $t7, finished_while_loop_for_simulating_game
+        
+        # So first get the direction from the direction String
+        # If we ran out of moves to do we will stop the loop
+        lbu $t1, 0($s2)
+        
+        beq $t1, $0, finished_while_loop_for_simulating_game
+        
+        # Now we have to actually call move_snake before we can determine
+        # whether or not the player have lost or is able to move on
+        move $a0, $s0 # The game struct
+        move $a1, $t1 # The direction that is read from the String of direction
+        move $a2, $s4 # The apple array
+        move $a3, $s5 # The number of pairs that is in the apple array
+        
+        # Now can finally call move_snake method
+        jal move_snake
+        
+        # Now in $v0 is the number of points that is scored by moving in that direction
+        # In $v1 is 1 if if it sucessfully added a new body segment or just simply moved
+        # in a free slot without any trouble. It is -1 if the direction given is invalid
+        # or if the apple after eating an apple isn't able to increase its body length due to
+        # the environmental constraints
+        
+        # Everytime we make a valid move let's print it
+        
+                
+        # First we check if $v1 is a -1 then we break out of this while loop immediately
+        li $t7, -1
+        beq $v1, $t7, finished_while_loop_for_simulating_game
+        
+        # However, if $v1 is not -1 then we can add in the scores to the total scores
+        # The formula will be score * (length of snake - 1)
+        # Let's get the length of the snake again
+        lb $t2, 4($s0)
+        
+        # We subtract one from it
+        addi $t2, $t2, -1
+        
+        # Then multiply it with the score which is in $v0 and store it back into $t2
+        mul $t2, $t2, $v0
+        
+        # Then add it to the toal score counter which is $s1
+        add $s1, $s1, $t2
+        
+        # Now if we are here we are sure that the snake either scored by eating an apple or just
+        # moved to an empty space
+        # We have to decrement the number of moves
+        addi $s3, $s3, -1
+        
+        # Then we also increment to the next direction
+        addi $s2, $s2, 1
+        
+        # We increase the number of moves we have executed here only the valid ones
+        addi $s6, $s6, 1
+        
+        # Then jump back up the loop
+        j while_loop_for_simulating_game
+        
+    finished_while_loop_for_simulating_game:
+    # If we are here then we are done simulating the game
+    # $s6 have the toal number of moves that executed
+    # $s1 have the total score we can just return it
+    move $v0, $s6
+    move $v1, $s1    
+    
+    # Then we are done simulating the game
+    j finish_simulate_game
+    
+    simulate_file_didnt_exist:
+    # If we are here then that means the file we are reading from didn't exist
+    # So we just have to return -1, -1 from simulate_game
+    li $v0, -1
+    li $v1, -1
+    
+    # Then we can just follow the next line logically to deallocate and restore registers
+    
+    finish_simulate_game:
+    # Restoring all the $s registers that we have used
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    lw $s2, 8($sp) # Restoring the $s2 register
+    lw $s3, 12($sp) # Restoring the $s3 register
+    lw $s4, 16($sp) # Restoring the $s4 register
+    lw $s5, 20($sp) # Restoring the $s5 register
+    lw $s6, 24($sp) # Restoring the $s6 register
+    
+    # Also restoring the return address else this function won't know how to return
+    lw $ra, 28($sp)
+    
+    # Deallocate all the 32 bytes that we have used
+    addi $sp, $sp, 32 # Deallocating 32 bytes
+    
+    # Then we can just jump back to the caller    
     jr $ra
 
 ############################ DO NOT CREATE A .data SECTION ############################
