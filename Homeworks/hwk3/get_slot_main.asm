@@ -1,6 +1,6 @@
 .data
-row: .byte 4
-col: .byte 11
+row: .byte 0
+col: .byte 8
 .align 2
 state:
 .byte 5  # num_rows
@@ -14,6 +14,15 @@ state:
 .text
 .globl main
 main:
+li $s0, 699
+li $s1, 699
+li $s2, 699
+li $s3, 699
+li $s4, 699
+li $s5, 699
+li $s6, 699
+li $s7, 699
+
 la $a0, state
 lb $a1, row
 lb $a2, col

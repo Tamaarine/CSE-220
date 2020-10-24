@@ -7,6 +7,10 @@ apples_length2: .word 5
 
 apples3: .byte 1 12 3 -5 -1 -1 -1 -1 4 1 -4 3 -1 -1
 apples_length3: .word 7
+
+apples4: .byte 0 -1 0 -1 0 -1 4 -1 11 4 17 7 4 11
+apples_length4: .word 7
+
 .align 2
 state:
 .byte 5  # num_rows
@@ -30,8 +34,8 @@ li $s6, 699
 li $s7, 699
 
 la $a0, state
-la $a1, apples3
-lw $a2, apples_length3
+la $a1, apples4
+lw $a2, apples_length4
 jal place_next_apple
 
 # You must write your own code here to check the correctness of the function implementation.

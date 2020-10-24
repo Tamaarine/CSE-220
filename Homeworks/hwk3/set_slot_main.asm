@@ -1,7 +1,7 @@
 .data
-row: .byte 4
-col: .byte 2
-ch: .byte '*'
+row: .byte 0
+col: .byte 5
+ch: .byte 'Q'
 .align 2
 state:
 .byte 5  # num_rows
@@ -25,6 +25,16 @@ jal set_slot
 # Here $v0 have the character that we stored
 move $a0, $v0
 li $v0, 1
+syscall
+
+li $v0, 11
+li $a0, '\n'
+syscall
+
+li $v0, 4
+la $t0, state
+addi $t0, $t0, 5
+move $a0, $t0
 syscall
 
 li $v0, 10

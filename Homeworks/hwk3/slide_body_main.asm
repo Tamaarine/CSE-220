@@ -1,17 +1,17 @@
 .data
-head_row_delta: .byte 1
-head_col_delta: .byte 0
+head_row_delta: .byte 0
+head_col_delta: .byte 1
 apples: .byte 1 7 3 2 1 4 4 3
 apples_length: .word 4
 .align 2
 state:
-.byte 8  # num_rows
-.byte 14  # num_cols
-.byte 4  # head_row
-.byte 5  # head_col
-.byte 14 # length
+.byte 2  # num_rows
+.byte 2  # num_cols
+.byte 0  # head_row
+.byte 0  # head_col
+.byte 1 # length
 # Game grid:
-.asciiz "....................##......................#..a.....#....#..1234..#..........56...E......##.7..CD.........89AB."
+.asciiz "1a.."
 
 .text
 .globl main

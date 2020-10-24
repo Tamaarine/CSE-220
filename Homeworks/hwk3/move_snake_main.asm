@@ -1,21 +1,31 @@
 .data
-direction: .byte 'Z'
+direction: .byte 'R'
 apples: .byte 1 2 2 9 0 5 1 7 6 10 3 10 3 11 2 10 2 1 2 4 2 5 1 13
 apples_length: .word 12
 .align 2
 state:
 .byte 5  # num_rows
 .byte 12  # num_cols
-.byte 2  # head_row
-.byte 4  # head_col
-.byte 7  # length
+.byte 1  # head_row
+.byte 5  # head_col
+.byte 35  # length
 # Game grid:
-.asciiz ".............a.#....#......#12..#......#.3..#........4567..."
+.asciiz "VUTSRQPO....Wa.#.1.NKJEDX..#.2.MLIFCY..#.3..#HGBZ....456789A"
 
 
 .text
 .globl main
 main:
+li $s0, 699
+li $s1, 699
+li $s2, 699
+li $s3, 699
+li $s4, 699
+li $s5, 699
+li $s6, 699
+li $s7, 699
+
+
 la $a0, state
 lbu $a1, direction
 la $a2, apples

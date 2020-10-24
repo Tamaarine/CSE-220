@@ -1,7 +1,7 @@
 .data
-row: .byte 4
-col: .byte 8
-target_part: .byte '4'
+row: .byte 3
+col: .byte 4
+target_part: .byte '.'
 .align 2
 state:
 .byte 5  # num_rows

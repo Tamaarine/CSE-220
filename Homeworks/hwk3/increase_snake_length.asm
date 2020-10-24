@@ -1,18 +1,28 @@
 .data
-direction: .byte 'U'
+direction: .byte 'L'
 .align 2
 state:
 .byte 5  # num_rows
-.byte 5  # num_cols
+.byte 12  # num_cols
 .byte 1  # head_row
-.byte 2  # head_col
-.byte 3  # length
+.byte 5  # head_col
+.byte 35  # length
 # Game grid:
-.asciiz "....a..1...#2#..#3#..###."
+.asciiz "VUTSRQPO....Wa.#.1.NKJEDX..#.2.MLIFCY..#.3..#HGBZ....456789A"
 
 .text
 .globl main
 main:
+li $s0, 699
+li $s1, 699
+li $s2, 699
+li $s3, 699
+li $s4, 699
+li $s5, 699
+li $s6, 699
+li $s7, 699
+
+
 la $a0, state
 lbu $a1, direction
 jal increase_snake_length

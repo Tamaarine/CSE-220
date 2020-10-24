@@ -1,0 +1,14 @@
+filename: .asciiz "game1100.txt"
+directions: .asciiz "UULLLLLLLLLLLLDDDDDDDDRDDDDDLLLLDDLLLURRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRDD"
+apples_length: .word 6
+num_moves_to_execute: .word 500
+apples: .byte 0 0 19 34 19 49 0 49 19 0 15 24
+.align 2
+state: .byte 0x0 0x0 0x0 0x0 0x0
+.asciiz "XArg153cyIJvv2dkivJvSpka5BXf4MyeauUCg5cfQjiY6bs6BKEqE1cXtvHZXArg153cyIJvv2dkivJvSpka5BXf4MyeauUCg5cfQjiY6bs6BKEqE1cXtvHZXArg153cyIJvv2dkivJvSpka5BXf4MyeauUCg5cfQjiY6bs6BKEqE1cXtvHZXArg153cyIJvv2dkivJvSpka5BXf4MyeauUCg5cfQjiY6bs6BKEqE1cXtvHZXArg153cyIJvv2dkivJvSpka5BXf4MyeauUCg5cfQjiY6bs6BKEqE1cXtvHZ"
+
+# Output
+# Number of moves
+# Score
+73
+1500
