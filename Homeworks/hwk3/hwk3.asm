@@ -2457,23 +2457,9 @@ simulate_game:
         # or if the apple after eating an apple isn't able to increase its body length due to
         # the environmental constraints
         
-        move $t6, $v0
-        
-        # Everytime we make a valid move let's print it
-        addi $t7, $s0, 5
-    	move $a0, $t7
-    	li $v0, 4
-    	syscall
-    
-    	li $v0, 11
-    	li $a0, '\n'
-    	syscall
-                
         # First we check if $v1 is a -1 then we break out of this while loop immediately
         li $t7, -1
         beq $v1, $t7, finished_while_loop_for_simulating_game
-        
-        move $v0, $t6
         
         # However, if $v1 is not -1 then we can add in the scores to the total scores
         # The formula will be score * (length of snake - 1)

@@ -37,7 +37,9 @@ move $t0, $v0
 move $t1, $v1
 
 li $v0, 1
-move $a0, $t0
+la $t0, state
+addi $t0, $t0, 2
+lb $a0, 0($t0)
 syscall
 
 li $v0, 11
@@ -45,7 +47,9 @@ li $a0, ' '
 syscall
 
 li $v0, 1
-move $a0, $t1
+la $t0, state
+addi $t0, $t0, 3
+lb $a0, 0($t0)
 syscall
 
 li $v0, 11
@@ -72,4 +76,4 @@ syscall
 li $v0, 10
 syscall
 
-.include "hwk3.asm"
+.include "helphw3.asm"
