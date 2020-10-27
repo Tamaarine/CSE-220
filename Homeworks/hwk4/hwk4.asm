@@ -261,10 +261,101 @@ strcmp:
     jr $ra
 
 initialize_hashtable:
+    # Now if we are here then this function takes an uninitialized HashTable struct and initialize it
+    # by setting the struct's capacity to the given capacity, the size to 0, element_size to the given
+    # element_size, and fill the entire element object array with 0 -> All capacity * element_Size bytes
     
+    # $a0 -> The pointer to the uninitialized block of memory for the hashtable
+    # $a1 -> The max number of element in the has tables elements array
+    # $a2 -> The size of a single struct element that is stored in one element of the hash table's 
+    # element array
+    # Output -> $v0, Return -1 if capacity is less than 1 or element_size is less than 1 or 0 otherwise
+    
+    # Keep in mind that the hashtable that we are making directly contain the array of structs
+    # and not just the pointer to the structs
+    
+    # So the first step that we have to do is to check whether or not the given capacity, and given
+    # element_size is less than 1 if it is we just return -1 without changing the hashtable pointer
+    # $t7 will be used as our value comparsion register
+    li $t7, 1
+    
+    # If we take this branch that means the given capacity to this function is less than
+    # 1 therefore it is considered invalid, hence we just return -1 and finish with this function
+    blt $a1, $t7, invalid_capacity_or_element_size_argument
+    
+    # Now if we are here then capacity is definitely greater than or equal to 1 which is fine
+    # but we still have to check if element_size is valid or not
+    # If we take this branch that means the given element_size is less than 1 which is invalid
+    # hence we just return -1 and finish with the function as well
+    blt $a2, $t7, invalid_capacity_or_element_size_argument
+    
+    # If we are here then that means the capacity and element_size are both valid therefore
+    # we can proceed to set the struct's attributes
+    
+    # First step, we set the struct's capacity field to the given capacity
+    # Capacity is stored at 0($a0) in the given hashtable and is size of 4 bytes (a word)
+    sw $a1, 0($a0) # Putting the given capacity in the hashtable's capacity
+    
+    # Second step, we set the struct's size field to 0 
+    # Size is stored at 4($a0) in the given hashtable and is also size of 4 bytes
+    sw $0, 4($a0) # Putting 0s in the hashtable's size field
+    
+    # Third step, we step the struct's element_size field to the given element_size
+    # Element_size is stored at 8($a0) in the given hashtable and is size of 4 bytes
+    sw $a2, 8($a0) # Putting the element size in the hashtable's element_size field
+    
+    # Fourth step, we have to clean all the capacity * element_size bytes to 0
+    # in the hashtable. We will be doing in through a for loop
+    # Let's compute how many byte we have to go through first which is capacity * element_size
+    # and store that result in $t1
+    mul $t1, $a1, $a2 # Multiplying capacity with element_size
+    
+    # We will be keeping a counter of how many bytes we have clean so far in $t0
+    li $t0, 0
+    
+    # Before we begin cleaning we have to move the $a0 pointer to actually point at the
+    # part of the struct that we have to clean which starts at 12($a0)
+    addi $a0, $a0, 12 # Adding offset of 12 to get the pointer to the first byte of the element array
+    
+    # This for loop will be going through the hashtable to clean the array
+    for_loop_to_clean_the_hashtable_array:
+    	# Let's check our stopping condition first
+    	# If our counter becomes greater than or equal to the number of bytes that we have to clean
+    	# then we are done clenaing the array and we can stop
+    	bge $t0, $t1, finished_cleaning_hashtable_array
+    	
+    	# Now if we are here then we have to actually clean the byte that is in 0($a0)
+    	# We are cleaning byte by byte not word by word
+    	sb $0, 0($a0) # Putting 0 in the byte that is in 0($a0)
+    
+    	# After we clean this byte we have to increment the byte counter
+    	addi $t0, $t0, 1
+    	
+    	# And we also have to increment $a0 to go to the next byte to clean
+    	addi $a0, $a0, 1
+    	
+    	# Then we jump back up the for loop
+    	j for_loop_to_clean_the_hashtable_array
+    
+    finished_cleaning_hashtable_array:
+    # Now if we are here then the for_loop have finished going through all the
+    # capacity * element_size bytes and clean all of them
+    # We can just return 0 as our output value and finish with the algorithm
+    li $v0, 0
+    
+    # Jump to finish algorithm
+    j finished_initialize_hashtable_function
 
-
-
+    invalid_capacity_or_element_size_argument:
+    # If we are here then either the given capacity or element_size argument is invalid
+    # hence we just return -1 in $v0 and finish with the function
+    li $v0, -1
+    
+    finished_initialize_hashtable_function:
+    # Because we didn't allocate any memories or used any $s register we don't have to deallocate
+    # or restore anything and can just return to the caller
+    
+    # Returning to the caller
     jr $ra
 
 hash_book:
