@@ -1,6 +1,6 @@
 .data
-str1: .asciiz "ABCD"
-str2: .asciiz "ABCGG"
+str1: .asciiz "sasdfa"
+str2: .asciiz "sasdfk"
 
 .text
 .globl main
@@ -10,6 +10,10 @@ la $a1,  str2
 jal strcmp
 
 # Write code to check the correctness of your code!
+move $a0, $v0
+li $v0, 1
+syscall
+
 li $v0, 10
 syscall
 
