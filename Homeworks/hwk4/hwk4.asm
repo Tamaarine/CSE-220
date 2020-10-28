@@ -359,6 +359,54 @@ initialize_hashtable:
     jr $ra
 
 hash_book:
+    # This function basically takes in a valid HashTable struct called books and an
+    # 13 - value ISBN value that we have to hash it, to hash it we just take
+    # the sum of the 13 ascii values and mod it by the capacity of the books hash table
+    
+    # $a0 -> The starting address of the HashTable structure
+    # $a1 -> The 13 null terminated character that represent valid ISBN
+    # Output -> $v0, the value of the hash function when evaluated for the provided ISBN
+    
+    # First step that we have to do is to sum up all the 13 ascii values that is in the ISBN
+    # we will put the sum of the ascii value inside $t0
+    li $t0, 0
+    
+    # Now next we will be using a for loop to do the summation
+    for_loop_to_sum_isbn:
+    	# Let's do our stopping condition first
+    	# which is when the character we get from $a1 is a null terminator then we will stop
+    	lbu $t1, 0($a1) # Loading the character from the ISBN
+    	
+    	# If the character that we read from the ISBN is a null terminator then we are
+    	# done summing all the ascii values from the ISBN and we can exit	
+    	beq $t1, $0, finished_summing_isbn_ascii
+    	
+    	# But if we are here then that means $t1 is not a null terminator hence we have to sum
+    	# it together into $t0
+    	add $t0, $t0, $t1 # Adding the ascii sum with the current ascii value from ISBN
+    	
+    	# After summing the current character we have to increment the ISBN String address to point
+    	# to the next character to sum
+    	addi $a1, $a1, 1
+    	
+    	# Then we jump back up the loop
+    	j for_loop_to_sum_isbn
+
+    finished_summing_isbn_ascii:
+    # Now if we are here then that means $t0 have the sum of all 13 ascii values
+    # and all we have to do is to divide it with the capacity of the HashTable
+    # Let's get the capacity from the hashtable first
+    # which is located at 0($a0) as the entire word, we will load it into $t1
+    lw $t1, 0($a0) # Loading capacity from the HashTable
+    
+    # Now we can do the division
+    div $t0, $t1 # Dividing the sum of ascii value by the capacity
+    
+    # We can get the remainder using mfhi which is our return value in $v0
+    mfhi $v0
+    
+    # Then that is it we are done with this function and can just return to the caller
+    # there is nothing to deallocate or to restore so we can just follow to jr $ra
     jr $ra
 
 get_book:
