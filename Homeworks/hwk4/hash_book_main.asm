@@ -1,7 +1,7 @@
 .data
 books:
 .align 2
-.word 13 0 68
+.word 7 7 68
 # empty or deleted entry starts here
 .align 2
 .byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
@@ -42,7 +42,7 @@ books:
 .align 2
 .byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 
-isbn: .asciiz "1123121401940"
+isbn: .asciiz "9780064408330"
 
 .text
 .globl main

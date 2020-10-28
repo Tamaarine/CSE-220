@@ -1,4 +1,4 @@
-# Test case #1
+# Test case #1 Passed
 .data
 books:
 .align 2
@@ -34,7 +34,7 @@ books:
 isbn: .asciiz "9780671028370"
 
 
-# Test case #2
+# Test case #2 Passed
 .data
 books:
 .align 2

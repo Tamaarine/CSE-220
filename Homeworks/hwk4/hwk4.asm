@@ -410,6 +410,281 @@ hash_book:
     jr $ra
 
 get_book:
+    # This function takes in a valid HashTable struct where each element in the arrayt is a book struct
+    # and it also takes in an ISBN String, it will return the index of where that ISBN is in the array
+    # of book struct and the number of entries we have looked by linear probing before it is found
+    
+    # $a0 -> The starting address of that valid HashTable struct
+    # $a1 -> The ISBN String that we want to find
+    # Output -> $v0, returns the index that the element is found, or -1 if the HashTable doesn't have
+    # that particular book
+    # Output -> $v1, returns the amount of books that is looked before a book is found or not found
+    
+    # So our first step is to save these two arguments because we we will be calling functions
+    # two arguments, is 8 byte, and the return address. 12 bytes in total
+    # Add in another $s register for saving the return index of the expected
+    # and another $s register for saving the total of book entry we have looked at
+    addi $sp, $sp, -20 # Allocating 20 bytes of memory in the run time stack
+    
+    # Now we save the $s registers before we can use them
+    sw $s0, 0($sp) # Saving $s0 register
+    sw $s1, 4($sp) # Saving $s1 register
+    sw $s2, 8($sp) # Saving $s2 register
+    sw $s3, 12($sp) # Saving $s3 register
+    
+    # Saving the return address
+    sw $ra, 16($sp)
+    
+    # Now we can move the arugments to the $s register
+    move $s0, $a0 # $s0 will have the valid HashTable struct
+    move $s1, $a1 # $s1 will have the ISBN String address that we want to find
+    
+    # Now we will call the hash_book function for the first time to check
+    # if the index that is expected is where the book belong
+    # $a0 -> HashTable
+    # $a1 -> ISBN String that we want to find
+    move $a0, $s0
+    move $a1, $s1
+    
+    # Now we can call the function hash_book
+    jal hash_book
+    
+    # We save the expected index into our $s2 register
+    move $s2, $v0
+    
+    # After calling hash_book $s2 will have the index where the
+    # the ISBN is 'suppose' to go in the book array
+    # Now we have to perform a one iteration check to see if probing is needed
+    # If the expected index does indeed have our book then we can just return
+    # the index we got as our $v0, and 1 as our $v1 because we only did one time check
+    # There is other cases, like deleted, empty, and another book which need to be handle separately
+    
+    # We must check the deletede and empty case first before
+    # To get the ISBN in that index we have to do some math calculation
+    # to get the effective address of that book, we will have to do
+    # 12($base_address) + index * element_size, which is always 68 because a
+    # book struct always take up 68 bytes
+    # Let's store 12($base_address) into a registe, $t0
+    addi $t0, $s0, 12 # Adding 12 byte to the HashTable to get to the starting address of the book struct array
+    
+    # Then we can get to any book struct in the array by adding index * 68
+    # let's do the multiplication and store the result into $t1
+    li $t7, 68 # Storing 68 into the $t7 for multiplication
+    
+    # Multiplying the index with 68 to get the offset
+    mul $t1, $s2, $t7
+    
+    # Then we can just add it into $t0 to get the effective address of that book struct
+    add $t0, $t0, $t1
+    
+    # We will load in the first byte of that book to help us check whether or not that book object
+    # is empty, deleted, or has a book into $t1
+    lbu $t1, 0($t0) # Loading the first byte of the book object unsigned 
+       
+    # If that byte is -1, 0xFF (unsigned byte) then we know that that that entry is definitely deleted
+    # hence probing is required
+    li $t7, 0xFF # 255, or -1 in the context of unsigned byte for -1 for comparsion
+    
+    # Now if the first byte of the book is a deleted then we have to go do probing
+    beq $t1, $t7, probing_required
+    
+    # However, if we are here then that means the first byte is not -1, meaning the book could be
+    # a book or empty we will check the empty case
+    beq $t1, $0, empty_expected_entry_found
+    
+    # Now if we are here then the book is not deleted, or empty, then it has to be an actual book
+    # in this index, and hence we must perform checks to determine whether, that book
+    # is the book we are looking for or we need to do probing
+    j a_book_expected_entry_found
+    
+    
+    empty_expected_entry_found:
+    # Now if we branch here then that means the expected location is empty
+    # hence there is no such book of given ISBN exist in the book array
+    # We just return -1 and 1 in our return value
+    li $v0, -1 # -1 for not able to find the book
+    li $v1, 1 # 1 for we only had to check one book to know there isn't such book in the book array
+    
+    # Then we are essentially done with the algorithm
+    j finished_get_book_algorithm
+    
+    
+    a_book_expected_entry_found:
+    # But if we branch here then that means the expected location does have a book
+    # we have to check whether or not this book matches the book we are looking for
+    # if so we will return the index it is found and 1 in our return value
+    # we will do the checking by calling strcmp, if it is not the one we are looking for
+    # then we have to do probing
+    
+    # $a0 -> str1, which is the ISBN we are looking for
+    # $a1 -> str2, which is the one in the expected book array, it is in $t0 already and we can just pass it in
+    move $a0, $s1 # The ISBN that we are looking for
+    move $a1, $t0 # The ISBN that we expect in the array
+    
+    # Calling the strcmp function
+    jal strcmp
+    
+    # Now in $v0 we have the answer whether or not the ISBN we are looking for is in the expected
+    # location, if it is not equal to 0 then we have to do probing
+    bne $v0, $0, probing_required
+    
+    # But if we are here then that means the expected ISBN matches our target ISBn
+    # hence we can just return $s2 in $v0, and 1 in $v1 because it only took one iteration
+    # to do the checking
+    move $v0, $s2 # $s2 have the expected index from the beginning
+    li $v1, 1 # We return 1 because it only take one check for checking the expected location
+    
+    # And we are done with the algorithm
+    j finished_get_book_algorithm
+    
+    probing_required:
+    # But if we are here then unfortunately we have to do probing procedures
+    # we will start probing at $s2 + 1, which is the next book after the expected location
+    # because the expected book is either deleted or it doesn't match our ISBN
+    addi $s2, $s2, 1 # Adding 1 to our expected location
+    
+    # We also need to keep track of the total number of books we have looked
+    # as part of our stopping condition it will start with 1 because we have looked at
+    # the expected book already. And the for loop will stop whenever it hits the capacity
+    # of the HashTable
+    li $s3, 1 # The total number of books checked counter
+    
+    for_loop_to_do_probing_search:
+    	# Our stopping condition will be whenever we find an empty entry or if the book counter hits
+    	# the capacity, or if the target book is found
+    	
+    	# First condition to check is if $s3 is less than the capacity. If it is greater than or equal to
+    	# the capacity then we have finished checking all the books but the target ISBN is not found
+    	# Loading in the capacity from the HashTable
+    	lw $t0, 0($s0) # Capacity is at 0($s0) of the HashTable
+    	
+    	# Stopping condition of looking through all books but target ISBN is not found 
+    	bge $s3, $t0, finished_checking_all_books_no_target_isbn_found
+    	
+    	# Now if we are here then that means we haven't look through all the books
+    	# Let's get our current book from the array through $s2, which is the counter for index of which
+    	# book we are looking at. We have to mod it with capacity because it will handle the wrap around
+    	div $s2, $t0 # Diving the index counter by the capacity, and in HI it will have the actual index we need to look
+    	
+    	# Let's store remainder (the index) into $t1
+    	mfhi $t1
+    	
+    	# Now with $t1 as the index we have to get the book by doing some calculation
+    	# 12($base_address) + index * element_size, element_size is always 68
+    	# Let's store 12($base_address) into $t2
+    	addi $t2, $s0, 12 # This gets us to the object array
+    	
+    	# Now we calculate the offset
+    	li $t7, 68 # 68 for multiplication
+    	
+    	# We store the multiplication result into $t3
+    	mul $t3, $t1, $t7 # Multiplying the index by 68
+    	
+    	# Then we add it back into the object array address
+    	add $t2, $t2, $t3 # This gets us the book that we are looking at
+    	
+    	# Now before we do strcmp we have to check if this book is currently, empty, deleted, or is an actual book
+    	# all we have to do is load in the first byte, we will load into $t3
+    	lbu $t3, 0($t2)
+    	
+    	li $t7, 0xFF # -1 without sign extension equivalent of -1
+    	
+    	# If the current book we have is a deleted entry then we have to continue the probing search
+    	beq $t3, $t7, next_probing_search_iteration
+    	
+    	# However, if the current book we have now is an empty book, then we stop searching
+    	# increment the number of books we looked at and return
+    	beq $t3, $0, probing_search_found_empty
+    	
+	# But if the book is not deleted, or not empty then we have to do the comparsion
+	j probing_search_found_a_book
+    	
+    	probing_search_found_empty:
+    	# If we are here then that means we have found an empty book during linear probing
+    	# hence we just have to increment $s3 counter once, load that in as our return value
+    	# and return -1 for unable to find the target ISBN in $v0
+    	li $v0, -1
+    	addi $s3, $s3, 1 # Incrementing $s3 once
+    	
+    	# Moving from $s3 as our return value for $v1
+    	move $v1, $s3
+    	
+    	# Then we are done with this algorithm
+    	j finished_get_book_algorithm
+    	    	
+    	probing_search_found_a_book:    	    	
+    	# Now we must call strcmp to compare the target ISBN and the current book ISBN we are looking at
+    	# $a0 -> str1
+    	# $a1 -> str2
+    	move $a0, $s1 # The book that we are looking for
+    	move $a1, $t2 # The book that we current have to compare with
+    	
+    	jal strcmp
+    	
+    	# In $v0 we have the result of whether or not the two ISBN is equal or not
+    	# if the result is $0 then we have found the book we need to find
+	beq $v0, $0, finished_for_loop_for_probing_search
+    
+    	# However, if the book didn't match then we have to check the next book
+    	# And the incrementation can just follow it logically
+    	
+    	next_probing_search_iteration:
+    	# If we are here then we will check on with the next iteration
+    	# before we jump back up we have to do some incrementation
+    	# We have to increment the index
+    	addi $s2, $s2, 1
+    	
+    	# We also have to increment the total number of books we have looked
+    	addi $s3, $s3, 1
+    	
+    	# Then we can jump back up the for loop
+    	j for_loop_to_do_probing_search
+    	
+    finished_for_loop_for_probing_search:
+    # If we are here then we have found the book we need to find
+    # before we can return we have to add 1 to the $s3 because we didn't
+    # increment that iteration in the for loop
+    addi $s3, $s3, 1
+    
+    # And that will be our $v1 return value
+    move $v1, $s3
+    
+    # For $v0 we have to do the mod with capacity to get the index we found the book in
+    lw $t0, 0($s0) # We load the capacity from the HashTable
+    
+    # We do the division with the index counter $s2
+    div $s2, $t0 
+    
+    # Then $v0 can just be the value in HI
+    mfhi $v0
+    
+    # And finally we can return as we are finished with the algorithm
+    j finished_get_book_algorithm
+    
+    
+    finished_checking_all_books_no_target_isbn_found:
+    # If we are here then that means that we have looked through all the books
+    # but the ISBN is not found hence we have to return -1 and the capacity
+    # because we have looked through all the books
+    li $v0, -1
+    move $v1, $s3 # Return $s3 because it will reach the capacity whenever we break out of the for loop with this condition
+    
+    # Then we can just follow the next line logically to return
+
+    finished_get_book_algorithm:
+    # If we are here then we have to restore all the $s registers that we have used
+    lw $s0, 0($sp) # Restoring $s0 register
+    lw $s1, 4($sp) # Restoring $s1 register
+    lw $s2, 8($sp) # Restoring $s2 register
+    lw $s3, 12($sp) # Restoring $s3 register
+    
+    # Restoring the return address or else get_book won't know where to return
+    lw $ra, 16($sp) # Restoring the return address
+
+    # Then we deallocate the memory that we used
+    addi $sp, $sp, 20 # Deallocating the 20 byte that we used
+
+    # Then we can jump back to the caller
     jr $ra
 
 add_book:
