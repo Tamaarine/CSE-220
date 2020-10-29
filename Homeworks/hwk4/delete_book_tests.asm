@@ -1,4 +1,5 @@
 # Attempt to delete a book from an empty hash table
+# PASSED
 .data
 isbn: .asciiz "9780553214830"
 books:
@@ -28,6 +29,7 @@ books:
 
 
 # Delete a book that is present in the hash table at the expected index
+# PASSED
 isbn: .asciiz "9780060855900"
 books:
 .align 2
@@ -115,6 +117,7 @@ books:
 
 
 # Delete a book that is not present in the hash table; expected location is deleted (hash table not full); probing required
+# PASSED
 .data
 isbn: .asciiz "9780064410150"
 books:

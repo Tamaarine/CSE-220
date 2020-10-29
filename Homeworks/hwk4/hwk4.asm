@@ -1404,18 +1404,213 @@ add_book:
     lw $ra, 28($sp)
     
     # Then we can finally deallocate the memory we have used
-    addi $sp, $sp, 28 # Deallocating the 28 bytes we have used
+    addi $sp, $sp, 32 # Deallocating the 32 bytes we have used
 
     # And we can return to the caller
     jr $ra
 
 delete_book:
+    # This function basically takes in an ISBN and tries to delete it from the given HashTable
+    # by filling the book struct with entirely -1 0XFF. It will only attempt to delete if
+    # it found the book by calling get_book which returns the index that book is found at
+    
+    # $a0 -> The valid starting address of the HashTable
+    # $a1 -> The 13 character null terminating ISBN String
+    # Output -> $v0, returns the index of where the book is deleted, if the book doesn't exist
+    # it will just return -1
+    
+    # Since we are going to be calling functions we have to save the two given arguments in the
+    # $s register and hence we have to allocate space for it on the run time stack to save it
+    # 2 arguments, 8 bytes and a return address total of 12 bytes
+    addi $sp, $sp, -12 # Allocating 12 bytes on the run time stack
+    
+    # Saving the $s registers before we can use them
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    
+    # Saving the return address
+    sw $ra, 8($sp)
+    
+    # Now we can use the $s registers to save the arguments
+    move $s0, $a0 # $s0 have the HashTable's address
+    move $s1, $a1 # $s1 have the ISBN 14 bytes
+    
+    # The first step is to obviously call get_book on that book to see if it exist
+    # if it doesn't exist then we return -1 and done with this function
+    # $a0 -> The HashTable we are looking the book from
+    # $a1 -> The ISBN we are looking for
+    move $a0, $s0 # The HashTable
+    move $a1, $s1 # The ISBN
+    
+    # Then we can call the function
+    jal get_book
+    
+    # Now in $v0 we have either the index that the book is in or -1 if that book doesn't exist
+    li $t7, -1 # Load in -1 for comparsion
+    
+    # We take the branch if the index is equal to -1 which means the book doesn't exist in the HashTable
+    beq $v0, $t7, delete_book_doesnt_exist
+    
+    # However if the book does exist then we have to do work to fill the entire struct with -1
+    # all 68 bytes of it
+    # 12($base_address) + index * element_size, is how we get to the effective address of a given index book
+    li $t7, 68 # Load in 68 for multiplication
+    
+    # We add 12 to the HashTable address to get us to the object array and we will store that into $t0
+    addi $t0, $s0, 12
+    
+    # Then we just have to simply multiply the index by 68, and we will store that into $t1
+    mul $t1, $v0, $t7 # Index * 68 to get us the offset
+    
+    # Then we will add the offset with the array address
+    add $t0, $t0, $t1 # Now we have the effective address of the book struct for which we need to delete
+    
+    # Then we just have to loop a for loop to do the deletion, it will loop 68 times to do in order to
+    # delete the 68 bytes to all -1
+    # We will have a simple counter to count the number of bytes we have deleted so far
+    li $t1, 0
+    
+    # Then we have our stopping condition which is just 68
+    li $t2, 68
+    
+    # We put the byte we need to replace which is -1 into $t7
+    li $t7, -1
+    
+    # Then this will be our for_loop that does the delete for us
+    for_loop_to_delete_book_struct:
+        # We do our stopping condition first which is whenever
+        # $t1 is greater than or equalto 68, that means we have finished deleting
+        # the 68 bytes already
+        bge $t1, $t2, finished_for_loop_deleting_book
+    
+        # But if we are here then that means we haven't finish deleting the book yet hence we have to
+        # actually delete the byte by storing the byte there
+        sb $t7, 0($t0)
+        
+        # After resetting the byte to -1 we have to do incrementation
+        # We increase our counter
+        addi $t1, $t1, 1
+        
+        # We also increase the address to the next byte that we have to delete
+        addi $t0, $t0, 1
+        
+        # Then just jump back up the loop
+        j for_loop_to_delete_book_struct
+    
+    finished_for_loop_deleting_book:
+    # If we are here then we have finished deleting the book
+    # the return value is already the index of the book we deleted
+    # hence we can just return without doing anything else
+    j finished_delete_book_algorithm
+    
+    delete_book_doesnt_exist:
+    # If we are here then that means the book we try to delete doesn't exist in the 
+    # HashTable hence we can just return -1 as our output value and done with the function
+    li $v0, -1
+    
+    # We can just follow the next line logically to exit 
+    
+    finished_delete_book_algorithm:
+    # If we are here then we are done with the algorithm and we have to
+    # start restoring the $s registers that we have used
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    
+    # We also have to restore the return address or else delete_book won't know where to return
+    lw $ra, 8($sp) # Restoring the return address    
+    
+    # Then we have to deallocate the memory we have used
+    addi $sp, $sp, 12 # Deallocating the 12 bytes of memory we have used
+    
+    # Now we can just used to the caller
     jr $ra
 
 hash_booksale:
+    # This fuynction basically takes in a HashTable and an ISBN null terminated String, and a customer_id to
+    # compute the Hash Function. The Hash Function is just summing up the 13 ascii values and
+    # sum up the digit values in customer_id and mod it by the capacity of the sales function by the grand total
+    # grand_total = sum_of_ascii + sum_of_digits
+    
+    # $a0 -> The starting address of the HashTable
+    # $a1 -> The 13 character null terminated String that represent ISBN
+    # $a2 -> An integer that provide the customer ID
+    # Output -> $v0, the hashed value
+    
+    # So let's just sum up the ascii value first and we will put the sum into $t0
+    li $t0, 0
+    
+    # This for loop will help me sum up the ISBN ascii value
+    for_loop_to_sum_isbn_booksale:
+        # So let's do our stopping condition first which is whenver
+        # the character we read is a null terminator which means we have already
+        # finished summing up all the 13 characters alredy
+        lbu $t1, 0($a1) # Load in the ascii character from ISBN
+        
+        # If we take this branch then that means we have finished summing up all the ISBN value    
+        beq $t1, $0, finished_for_loop_to_sum_isbn
+        
+        # If we are here then we have to actually sum the ascii value up
+        add $t0, $t0, $t1
+        
+        # Then we increment the ISBN address to get the next character
+        addi $a1, $a1, 1
+        
+        # And we jump back up the loop
+        j for_loop_to_sum_isbn_booksale
+    
+    finished_for_loop_to_sum_isbn:
+    # Now if we are here then that means $t0 have the sum of all 13 ascii values
+    # next we have to sum the digits from the customer_id which we will be doing through
+    # modding by 10, Let's put 10 into $t7 for our division operation
+    li $t7, 10
+    
+    # We will be putting the sum of digits into $t1
+    li $t1, 0
+    
+    # This for loop will help me us sum up the customer's id
+    for_loop_to_sum_customer_id:
+        # First we will check if the customer_id $a2 is 0 yet, if it is 0
+        # then we exit because we have sum up the digits already
+        beq $a2, $0, finished_summing_customer_id
+        
+        # If there is still quotient remaining then we will do division
+        # and replace the customer id with the quotient and we sum the remainder
+        div $a2, $t7 # We divide the customer id by 10 which get us the last digit
+        
+        # Then we load the remainder into $t2
+        mfhi $t2 
+        
+        # We load the quotient back into $a2
+        mflo $a2
+        
+        # Then we sum the last digit with the accumulator
+        add $t1, $t1, $t2
+        
+        # Then we jump back up the loop
+        j for_loop_to_sum_customer_id
+    
+    finished_summing_customer_id:
+    # Then if we are here then $t0 have the sum of ascii, $t1 have the sum of digits
+    # we just add them together and divide by the capacity
+    add $t0, $t0, $t1 # Adding the ascii value with the digit sum into $t0
+    
+    # Then we need to load the capacity which is located at 0($a0)
+    lw $t1, 0($a0)
+    
+    # Then we do the division
+    div $t0, $t1
+    
+    # And we put the remainder into our output value
+    mfhi $v0        
+    
+    # And that's it we can just return to the caller
     jr $ra
 
 is_leap_year:
+    
+    
+    
+    
     jr $ra
 
 datestring_to_num_days:
