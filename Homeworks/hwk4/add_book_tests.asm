@@ -1,4 +1,5 @@
 # Add a book to an empty hash table
+# Passed
 .data
 isbn: .asciiz "9780553214830"
 title: .asciiz "The Declaration of Independence"
@@ -18,7 +19,7 @@ books:
 # empty or deleted entry starts here
 .align 2
 .byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
-# empty or deleted entry starts here
+# empty or deleted entry starts here, Suppose to insert into this one
 .align 2
 .byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 # empty or deleted entry starts here
@@ -34,7 +35,9 @@ books:
 .align 2
 .byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 
+
 # Add a book to a hash table with existing values; no collisions
+# PASSED
 .data
 isbn: .asciiz "9781620610090"
 title: .asciiz "Opal (Lux, #3)"
@@ -122,6 +125,8 @@ books:
 .align 2
 .byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 
+
+
 # Add a book to a hash table with existing values; collisions with multiple probes required
 .data
 isbn: .asciiz "9781455525930"
@@ -185,6 +190,9 @@ books:
 .ascii "Terry Pratchett\0\0\0\0\0\0\0\0\0\0"
 .word 0
 
+
+
+
 # Add book to hash table with existing values; multiple "deleted" slots
 .data
 isbn: .asciiz "9780451230230"
@@ -193,19 +201,19 @@ author: .asciiz "Hugh Ambrose"
 books:
 .align 2
 .word 7 4 68
-# Book struct start
+# Book struct start 0
 .align 2
 .ascii "9780345501330\0"
 .ascii "Fairy Tail, Vol. 1 (Fair\0"
 .ascii "Hiro Mashima, William Fl\0"
 .word 7777
-# empty or deleted entry starts here
+# empty or deleted entry starts here 1
 .align 2
 .byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
-# empty or deleted entry starts here
+# empty or deleted entry starts here 2
 .align 2
 .byte -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 
-# Book struct start
+# Book struct start 3
 .align 2
 .ascii "9780670032080\0"
 .ascii "Financial Peace Revisite\0"

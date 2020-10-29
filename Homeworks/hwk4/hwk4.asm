@@ -687,7 +687,726 @@ get_book:
     # Then we can jump back to the caller
     jr $ra
 
+strlength:
+    # This is suppose to be a helper method for add_book
+    # to find the length of a given String
+    
+    # a0 -> The null terminated String we are looking the length for
+    # Output -> $v0, the length of the String
+    
+    # We will be keeping a counter as 0 in $t0
+    li $t0, 0
+    
+    for_loop_for_finding_length_of_string:
+    	# We will do our stopping condition first which is whenever
+    	# we hit a null terminator
+    	lbu $t1, 0($a0) # Loading in the current byte from the given String
+    	
+    	# This is our stopping condition if we hit a null terminator in the String
+    	# then we are done finding the length
+    	beq $t1, $0, finished_loop_finding_length_of_string
+    
+        # However if it is not a null terminator then we have to
+        # increment the counter
+        addi $t0, $t0, 1
+        
+        # And we also need to increment the String address to point to the next character
+        addi $a0, $a0, 1
+        
+        # Then we jump back up the loop
+        j for_loop_for_finding_length_of_string
+    
+    finished_loop_finding_length_of_string:
+    # Then if we are out here that means $t0 have the lenght of the String
+    # We can just put into our output value
+    move $v0, $t0
+    
+    # And return
+    jr $ra
+    
 add_book:
+    # This function essentially attempt to insert the given book into the HashTable struct
+    
+    # $a0 -> The starting address of a valid HashTable
+    # $a1 -> The 13 character null-terminated String that represent a valid ISBN
+    # $a2 -> The null terminated String that represent the book title
+    # $a3 -> The null terminated String that represent the book author
+    # Output -> $v0, the index of element where the new book is added or found if it already exist
+    # returns -1 if the table is full
+    # Output -> $v1, the number of entries accessed before the book is added or -1 if the table is full
+    
+    # Because we will be calling functions we have to store the arguments into $s registers
+    # total of 4 arguments, 16 bytes, and a return address total of 20 bytes
+    # Add another three more register that is required later so 12 more bytes
+    addi $sp, $sp, -32 # Allocating 32 bytes in the run time stack
+    
+    # Saving the $s registers before we can use it
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    sw $s2, 8($sp) # Saving the $s2 register
+    sw $s3, 12($sp) # Saving the $s3 register
+    sw $s4, 16($sp) # Saving the $s4 register
+    sw $s5, 20($sp) # Saving the $s5 register
+    sw $s6, 24($sp) # Saving the $s6 register
+    
+    # Saving the return address
+    sw $ra, 28($sp)
+    
+    # Now we can save the arguments
+    move $s0, $a0 # $s0 have the valid HashTable
+    move $s1, $a1 # $s1 have the 13 null terminated String that represent ISBN
+    move $s2, $a2 # $s2 have the String that represent book title
+    move $s3, $a3 # $s3 have the String that represent book author
+    
+    # Okay first step is to check if the HashTable is full or not, if the table is full
+    # then the function just returns (-1,-1) and finishes
+    # Let's grab the capacity and size field from the HashTable
+    lw $t0, 0($s0) # Getting the capacity from the HashTable
+    
+    # Getting the size from the HashTable
+    lw $t1, 4($s0)
+    
+    # If this branch is true then that means the HashTable still have space
+    # hence we can proceed to work on adding the new book into the HashTable
+    bne $t0, $t1, add_book_not_full_hashtable
+    
+    # However, if it is not true then size == capacity
+    # therefore we return (-1,-1)
+    li $v0, -1
+    li $v1, -1
+    
+    # Then we can just jump to finish because we are done with this algorithm no more work is required
+    j finished_add_book_algorithm
+
+
+    add_book_not_full_hashtable:
+    # If we are here then that means the HashTable is not full so we can try to add in
+    # the book into the HashTable
+    # We call get_book with the given ISBN, to see if the book is already in the HashTable
+    # If it is then we just return the value return by get_book
+    # $a0 -> HashTable
+    # $a1 -> ISBN
+    move $a0, $s0 # $a0 is the HashTable we looking through
+    move $a1, $s1 # $a1 is the ISBN we are looking for 
+    
+    # Then we can call the function
+    jal get_book
+    
+    # In $v0 we have the index that the target book is found
+    # $v1 we have the number of books we looked before the book is found or not found
+    # We just have to compare $v0 if $v0 index is -1 then we know for sure the book is not in the HashTable
+    li $t7, -1
+    
+    # If the return value is not equal to -1 then the book is not found in the HashTable
+    beq $v0, $t7, book_is_not_found_in_hashtable
+    
+    # But if the previous branch is false that means get_book indeed found the book in the
+    # HashTable and we can just return the valuye return by get_book as our output value
+    # We can just jump to finish algorithm
+    j finished_add_book_algorithm
+    
+    
+    book_is_not_found_in_hashtable:
+    # If we are here then that means the book doesn't exist in the HashTable hence
+    # actual insertion is required for this book
+    
+    # We must call hash_book first to determine where the book is expected to go
+    # and if linear probing is required to find a place to put this book
+    # $a0 -> The HashTable we are looking through
+    # $a1 -> The ISBN that we are hashing
+    move $a0, $s0 # The HashTable struct we are looking through
+    move $a1, $s1 # The ISBN String we are hasing
+    
+    # Now we can call the function
+    jal hash_book
+    
+    # Let's save $v0 for the expected operations
+    move $s5, $v0
+    
+    # Now in $s5 we have the index where the book is suppose to go
+    # We will do a iteration to check for the expected placement
+    # We load in the first byte to check whether or not it is empty or deleted entry already
+    # We have to add 12 byte to the HashTable to get to the object array
+    addi $t0, $s0, 12 # Adding 12 byte to the HashTable to get to object array
+    
+    # 12($base_address) + index * element_size
+    # We load in 68 as our element_size because book struct is fixed sized for multiplication
+    li $t7, 68
+    
+    # Then we multiply the index with 68 to get our offset
+    # we will put the offset into $t1
+    mul $t1, $s5, $t7
+    
+    # Then we add the offset to the base_address to get the effective address of that
+    # book struct in our array and put it back into $t0
+    add $t0, $t0, $t1
+    
+    # Next we only load in the first byte to check whether or not if it is deleted, empty, or already has a book
+    lbu $t1, 0($t0) # Loading in the first byte from the book struct
+    
+    # We load in -255 for comparsion of a deleted entry
+    li $t7, 0xFF
+    
+    # If we are here then the first byte of the book is negative meaning it is a
+    # deleted entry we can just put the book into that spot without any more work
+    beq $t1, $t7, add_book_dont_require_probing
+    
+    # If we are here then it can be empty or a book entry
+    # So we do a further check if the first byte is 0 then it is empty
+    # which means we can put that book into the spot without any problem
+    beq $t1, $0, add_book_dont_require_probing
+    
+    # Now if we are here then that means the expected spot is occupied by another book hence
+    # linear probing is require to find a place to put the book
+    j add_book_require_probing
+    
+    
+    add_book_dont_require_probing:
+    # Now if we are here then that means the expected placement is a deleted or empty entry
+    # we can just put the book into that expected spot without any trouble
+    # We have our effective address for that book in $t0, because we will be calling
+    # memcpy here let's just store $t0 into $s4 as a backup
+    move $s4, $t0 # $s4 temporarily have the expected location's book address for doing data placement
+    
+    # We can for sure put the 13 bytes into the book object first
+    # $a0 -> Is the destination where we want to put our ISBN
+    # $a1 -> Is the source where we are copying the ISBN from
+    # $a2 -> Is how many bytes we are copying which is just 13
+    move $a0, $s4 # This is the book object we are writing the ISBN to
+    move $a1, $s1 # This is the ISBN we are copying from
+    li $a2, 14 # 13 character hence 13 bytes, but also include the null terminator
+    
+    # Now we can call memcpy function
+    jal memcpy
+    
+    # Now after calling memcpy we have sucessfully placed the ISBN into the book object
+    # Now we have to handle the title as well as the author
+    # This is what we will do, we find the length of author first, if the length is > 24
+    # we copy only 24 byte set the 25th byte to \0
+    # If the length is <= 24, we copy the length byte and do padding for 25 - length bytes
+    
+    # Let's call strlength on title first
+    move $a0, $s2
+    
+    # Calling the function
+    jal strlength 
+    
+    # Now in $v0 we have the length of the String
+    # We will break into two cases if length > 24 and if length <= 24
+    li $t7, 24
+    
+    # If the length of title is greater than 24 bytes then we copy only 24 bytes and set 25byte to \0
+    bgt $v0, $t7, copy_title_24_bytes
+    
+    # We will put a counter for the number of bytes we have cleared
+    li $t0, 0
+    
+    # We have 25 bytes hence 25 is our stopping condition
+    li $t1, 25
+    
+    # The address we do the cleaning is from 14($s4), let's store it into $t2
+    addi $t2, $s4, 14 # This gets us to the title
+   
+    # If we are here then that means the length of title is <= 24
+    # What we will do it set all the 25 bytes into \0
+    # then just copy length byte from the title, which effectively did the same thing as paddin
+    for_loop_to_null_terminate_title:
+    	# Let's do our stopping condition first
+    	# which is when our counter is greater than or equal to 25
+    	bge $t0, $t1, finished_null_terminating_title
+    	
+    	# Now if we are here then that means we have to null terminate this byte
+    	sb $0, 0($t2) # Null terminating this byte
+    	
+    	# Then we have to do the incrementation
+    	addi $t0, $t0, 1
+    	
+    	# We also have to increment the address the next byte we null terminate
+    	addi $t2, $t2, 1
+    	
+    	# Then jump back up the loop
+    	j for_loop_to_null_terminate_title
+    
+    finished_null_terminating_title:
+    # Now if we are outside then that means all 25 byte in title are null terminated
+    # we can just copy length byte into 14($s4)
+    # $a0 -> The place where we are storing the title to, 14($s4)
+    # $a1 -> The place where we are copying the title from, $s2
+    # $a2 -> The number of bytes we are copying which is just $v0, length bytes
+    addi $a0, $s4, 14
+    move $a1, $s2 # The title we are copying
+    move $a2, $v0 # The number of bytes we are copying, which is just length bytes
+    
+    # Then we have to call the method that does the copying
+    jal memcpy
+    
+    # Now after we finish copying the title we have to also do the same for author
+    # god dammit
+    j handle_copying_author
+    
+    copy_title_24_bytes:
+    # However if we are here then we just have to copy 24 bytes of the title
+    # and set the 25th byte to \0
+    # $a0 -> The place where we are copying it to
+    # $a1 -> The String that we are copying from
+    # $a2 -> The number of bytes that we have to copy which is 24
+    
+    # Title starts at the 14($s4), so we have to add it before we can pass into $a0
+    addi $a0, $s4, 14
+    move $a1, $s2 # $a1 is just the title
+    li $a2, 24 # We are copying 24 bytes
+    
+    # Calling the memory copy function
+    jal memcpy 
+    
+    # Now we copied the 24 bytes from title we have to set the 25th byte to \0
+    addi $t0, $s4, 38 # Adding 38 will bring us to the last character in title of the book array
+    sb $0, 0($t0) # Then we just have to put a null terminator there
+    
+    
+    handle_copying_author:
+    # After finishing copying and padding for title we also have to do the same for the author
+    # We will first figure out the length of author as well
+    move $a0, $s3
+    
+    # Calling strlength
+    jal strlength
+    
+    # Now in $v0 we have the length of the author
+    # again we will break into two difference cases for handling
+    li $t7, 24
+    
+    # If the length of author is greater than 24 bytes we just have to copy 24 bytes
+    # and set the 25th byte to \0
+    bgt $v0, $t7, copy_author_24_bytes
+    
+    # However, if we are here then that means the length is less than or equal to 24
+    # we will just null terminate everything first then copy length bytes
+    # We will put a counter for the number of bytes we have cleared
+    li $t0, 0
+    
+    # We have 25 bytes hence 25 is our stopping condition
+    li $t1, 25
+    
+    # The address we do the cleaning is from 39($s4), let's store it into $t2
+    addi $t2, $s4, 39 # This gets us to the author 
+   
+    # If we are here then that means the length of title is <= 24
+    # What we will do it set all the 25 bytes into \0
+    # then just copy length byte from the title, which effectively did the same thing as paddin
+    for_loop_to_null_terminate_author:
+    	# Let's do our stopping condition first
+    	# which is when our counter is greater than or equal to 25
+    	bge $t0, $t1, finished_null_terminating_author
+    	
+    	# Now if we are here then that means we have to null terminate this byte
+    	sb $0, 0($t2) # Null terminating this byte
+    	
+    	# Then we have to do the incrementation
+    	addi $t0, $t0, 1
+    	
+    	# We also have to increment the address the next byte we null terminate
+    	addi $t2, $t2, 1
+    	
+    	# Then jump back up the loop
+    	j for_loop_to_null_terminate_author
+    
+    finished_null_terminating_author:
+    # If we are here then that means we have finshed null-terminating all of the bytes inside author
+    # then we can start copying length byte
+    # $a0 -> The place where we are copying author to
+    # $a1 -> The place where we are copying author from $s3
+    # $a2 -> The number of bytes we are copying which is just length
+    addi $a0, $s4, 39 # Add 39 will get us to the starting address of author
+    move $a1, $s3 # The author we are copying
+    move $a2, $v0 # The number of bytes we are copying, which is just length bytes
+    
+    # Calling memcpy
+    jal memcpy
+    
+    # Furthermore we have to reset the sales to 0
+    addi $t0, $s4, 64 # This is the starting address of that word
+    sw $0, 0($t0) # We put 0 in that entire word
+
+    # And we also have to increment the HashTable's size because we have put one books in
+    # the size is located at 4($s0) of the HashTable, we load it in first
+    lw $t0, 4($s0)
+    
+    # We add one to it
+    addi $t0, $t0, 1
+    
+    # Then we put it back in
+    sw $t0, 4($s0)
+
+    # We load the index that we found it from $s5
+    move $v0, $s5
+    
+    # Load the number of books looked which is just
+    li $v1, 1
+    
+    # Then we are done handling this case
+    # and done with this algorithm if expected place is where we are putting the book
+    j finished_add_book_algorithm
+    
+    copy_author_24_bytes:
+    # Now if we are here then we only have to copy 24 bytes from the author because
+    # author is more than 24 characters
+    # $a0 -> The place where we are copying it to
+    # $a1 -> The String that we are copying from
+    # $a2 -> The number of bytes that we have to copy which is 24
+    
+    # Title starts at the 39($s4), so we have to add it before we can pass into $a0
+    addi $a0, $s4, 39
+    move $a1, $s3 # $a1 is just the author
+    li $a2, 24 # We are copying 24 bytes
+    
+    # Calling memcpy
+    jal memcpy 
+    
+    # Now we have to null terminate the character at index 24
+    addi $t0, $s4, 63 # Adding 63 will bring us to the last character in title of the book array
+    sb $0, 0($t0) # Then we just have to put a null terminator there
+    
+    # Furthermore we have to reset the sales to 0
+    addi $t0, $s4, 64 # This is the starting address of that word
+    sw $0, 0($t0) # We put 0 in that entire word
+
+    # And we also have to increment the HashTable's size because we have put one books in
+    # the size is located at 4($s0) of the HashTable, we load it in first
+    lw $t0, 4($s0)
+    
+    # We add one to it
+    addi $t0, $t0, 1
+    
+    # Then we put it back in
+    sw $t0, 4($s0)
+
+    # We load the index that we found it from $s5
+    move $v0, $s5
+    
+    # Load the number of books looked which is just
+    li $v1, 1
+    
+    # And we are done with this case we can just finish algorithm
+    j finished_add_book_algorithm
+
+
+    add_book_require_probing:
+    # If the expected place already has a book then we have to do linear probing in order to find
+    # a place to put the insert the book. Oh wish me good luck
+    
+    # We need a counter to keep track of which index we are looking at 
+    # which is already in $s5, but because $s5 is already occupied we are going to
+    # be looking at the book immediately right after it, so we will be adding 1 to $s5
+    addi $s5, $s5, 1
+    
+    # Then we also need a counter to keep track of the number of books we have already looked at
+    # which starts with 1 and we will be putting it inside $s4
+    li $s4, 1
+    
+    # Now we have to put this through a for loop in order to find the approriate place to put
+    # this book and we are guaranteed to find one
+    for_loop_add_book_probing:
+    	# Our stopping condition will simply just be whenever
+    	# we find a empty or deleted entry in our HashTable
+    	# If we ever find a book entry then we will skip into the next iteration
+    	# Let's load in the book that we are looking at first
+    	# 12($base_address) + index * element_size
+    	# Let's get 12($base_address) and put it into $t0
+    	addi $t0, $s0, 12 # This gets us to the starting address of the array
+	
+        # We have to get the remainder by dividing $s5 with the capacity in order to handle
+        # the loop arounds
+        # Let's get the capacity first and put it into $t2 which is located at 0($s0)
+        lw $t2, 0($s0) # $t2 have the capacity
+        
+        # Then we haver to do the division $s5 / $t2 in order to get the actual index
+        div $s5, $t2
+        
+        # We move the index into $t3
+        mfhi $t3
+        
+        li $t7, 68 # 68 for multiplying with index
+        
+        # We multiply the index with 68 to get our offset
+        mul $t1, $t7, $t3
+        
+        # Then we add the offset to $t0 to get our effective address for that book we are looking at
+        add $t0, $t0, $t1
+        
+        # Now we load in the first byte to help us check whether or not we can put a book
+        # in this place or not
+        lbu $t1, 0($t0)
+        
+        # Now if the first byte is -1 then we know for sure it is a deleted entry and we can exit the
+        # loop and put the book there
+        li $t7, 0xFF
+        beq $t1, $t7, place_book_entry_in_delete_or_empty
+        
+        # We also need to check if it is empty
+        beq $t1, $0, place_book_entry_in_delete_or_empty
+        
+        # However, if we are here that means the book is already occupied
+        # no need to do more work just move and check the next book
+        
+        next_iteration_add_book_probing:
+        # If we are here then it is because we encountered a book already occupying this space
+        # so we have to look at the next index
+        # We have to increment the index counter
+        addi $s5, $s5, 1
+        
+        # We have to increment the number of books we examine counter
+        addi $s4, $s4, 1
+        
+        # Then we can jump back up the loop
+        j for_loop_add_book_probing
+    
+    
+    place_book_entry_in_delete_or_empty:
+    # If we are here then that means we just came out of the for loop
+    # finding a place to put the books to, we have to add one more value to
+    # $s4, because it didn't account for the one that we came out with
+    addi $s4, $s4, 1
+    
+    # Now in $t0 we have the effective address of where we have to put our
+    # books in. We have to again break it into several difference cases 
+    # We will store $t0 into $s6 so the address of where we are putting our book
+    # can be preserved across function calls
+    move $s6, $t0
+    
+    # First things first we will copy the in the ISBN into $s6, keep in mind that it is 14 bytes and not 13 bytes
+    # $a0 -> The place that we are storing the ISBN
+    # $a1 -> The place that we are copying the ISBN from which is just $s1
+    # $a2 -> How many bytes we are copying, which is 14
+    move $a0, $s6
+    move $a1, $s1
+    li $a2, 14
+    
+    # Then we call the actual function to copy it
+    jal memcpy
+    
+    # Now after the memcpy call, the ISBN is copied now we have to handle the title and the author
+    # We will do it through a similar procedure we have done in the beginning
+    # Let's handle copying the book's title first
+    # We need the length of the title first call strlength to help us do that
+    move $a0, $s2
+    
+    # Calling the function 
+    jal strlength
+    
+    # In $v0 we have the length of the title we will compare with 24 to break into
+    # two separate cases
+    li $t7, 24
+    
+    # We take the branch if the length of the title is greater than 24
+    # which means we will just copy only 24 bytes 
+    bgt $v0, $t7, copy_title_24_bytes_probing
+    
+    # If we didn't take the branch that means the title is less than or equal to 24 character
+    # hence we have to do the paddings here. We will clean the 25 bytes first
+    # and then just copy length title there
+    # $t0 will be the number of bytes we have cleaned so far
+    li $t0, 0
+    
+    # We have 25 bytes hence 25 is our stopping condition
+    li $t1, 25
+    
+    # The address we do the cleaning is from 14($s6), let's store it into $t2
+    addi $t2, $s6, 14 # This gets us to the title
+    
+    # Now a for loop that going through 25 times
+    for_loop_to_null_terminate_title_probing:
+        # Let's do our stopping condition
+        # when our counter is greater than or equal to 25
+        bge $t0, $t1, finished_null_terminating_title_probing
+        
+        # Now we null terminate the byte here
+        sb $0, 0($t2)
+        
+        # Then we do our incrementation
+        addi $t0, $t0, 1
+        
+        # Increment our address as well
+        addi $t2, $t2, 1
+        
+        j for_loop_to_null_terminate_title_probing
+        
+    finished_null_terminating_title_probing:
+    # Now if we are here then that means we are finished null terminating the title
+    # we can actually copy the title into it now
+    # $a0 -> The place where we are storing the title to 14($s6)
+    # $a1 -> The title we are copying from
+    # $a2 -> The number of bytes we are copying which is just the length
+    addi $a0, $s6, 14
+    move $a1, $s2 # The title we are copying from
+    move $a2, $v0 # Number of bytes we are copying, just the length
+    
+    # We have to call the function to copy the memory
+    jal memcpy
+    
+    # Now after we handle the title we have to handle the author
+    j handle_copying_author_probing    
+    
+    copy_title_24_bytes_probing:
+    # If we are here then we are only copying 24 bytes and 25th byte is \0
+    # $a0 -> The place we are copying the title to
+    # $a1 -> The title we are copying from
+    # $a2 -> The number of bytes we are copyiong
+    addi $a0, $s6, 14
+    move $a1, $s2 # The title we are copying from
+    li $a2, 24
+    
+    # Then we call memcpy function
+    jal memcpy
+        
+    # Now we copied the 24 bytes from title we have to set the 25th byte to \0
+    addi $t0, $s6, 38 # Adding 38 will bring us to the last character in title of the book array
+    sb $0, 0($t0) # Then we just have to put a null terminator there
+    
+    
+    handle_copying_author_probing:
+    # After we finished copying the title we have to copy the author
+    # same procedure get the length of the author first
+    move $a0, $s3
+    
+    # Calling strlength
+    jal strlength
+    
+    li $t7, 24
+    
+    # If the length is greater than 24 then we copy 24 bytes and null terminate the last one
+    bgt $v0, $t7, copy_author_24_bytes_probing    
+    
+    # But if we are here then that means the author is less than or equal to 24 characters
+    # so we have to do the freaking padding
+    # Counter for the number of bytes we cleaned
+    li $t0, 0
+    
+    # We have 25 bytes hence 25 is our stopping condition
+    li $t1, 25
+    
+    # The address we do the cleaning is from 39($s6), let's store it into $t2
+    addi $t2, $s6, 39 # This gets us to the author
+    
+    # Now a for loop that going through 25 times
+    for_loop_to_null_terminate_author_probing:
+        # Let's do our stopping condition
+        # when our counter is greater than or equal to 25
+        bge $t0, $t1, finished_null_terminating_author_probing
+        
+        # Now we null terminate the byte here
+        sb $0, 0($t2)
+        
+        # Then we do our incrementation
+        addi $t0, $t0, 1
+        
+        # Increment our address as well
+        addi $t2, $t2, 1
+        
+        j for_loop_to_null_terminate_author_probing
+        
+    finished_null_terminating_author_probing:
+    # Now if we are here then that means we are finished null terminating the author
+    # we can actually copy the author into it now
+    # $a0 -> The place where we are storing the author to 39($s6)
+    # $a1 -> The author we are copying from
+    # $a2 -> The number of bytes we are copying which is just the length
+    addi $a0, $s6, 39
+    move $a1, $s3 # The author we are copying from
+    move $a2, $v0 # Number of bytes we are copying, just the length
+    
+    # Now we call memcpy
+    jal memcpy
+    
+    # After calling we have to reset the number of sales
+    addi $t0, $s6, 64 # This is the starting address of that word number of sales
+    sw $0, 0($t0) # We put 0 in that entire word
+
+    # And we also have to increment the HashTable's size because we have put one books in
+    # the size is located at 4($s0) of the HashTable, we load it in first
+    lw $t0, 4($s0)
+    
+    # We add one to it
+    addi $t0, $t0, 1
+    
+    # Then we put it back in
+    sw $t0, 4($s0)
+
+    # We get the capacity first
+    lw $t0, 0($s0)
+    
+    # Divide by $s5
+    div $s5, $t0
+
+    # $v0 output is mfhi
+    mfhi $v0
+        
+    # $v1 is the number of books we looked which is just $s4
+    move $v1, $s4
+    
+    j finished_add_book_algorithm
+    
+    copy_author_24_bytes_probing:
+    # If we are here then we are only copying 24 bytes and 25th byte is \0
+    # $a0 -> The place we are copying the author to
+    # $a1 -> The author we are copying from
+    # $a2 -> The number of bytes we are copying
+    addi $a0, $s6, 39
+    move $a1, $s3 # The author we are copying from
+    li $a2, 24    
+    
+    # Then we call memcpy function
+    jal memcpy   
+    
+    # Now we have to null terminate the character at index 24
+    addi $t0, $s6, 63 # Adding 63 will bring us to the last character in title of the book array
+    sb $0, 0($t0) # Then we just have to put a null terminator there
+    
+    # After we fix null terminator we also have to reset the number of sales
+    addi $t0, $s6, 64 # This is the starting address of that word number of sales
+    sw $0, 0($t0) # We put 0 in that entire word
+
+    # And we also have to increment the HashTable's size because we have put one books in
+    # the size is located at 4($s0) of the HashTable, we load it in first
+    lw $t0, 4($s0)
+    
+    # We add one to it
+    addi $t0, $t0, 1
+    
+    # Then we put it back in
+    sw $t0, 4($s0)
+
+    # We get the capacity first
+    lw $t0, 0($s0)
+    
+    # Divide by $s5
+    div $s5, $t0
+
+    # $v0 output is mfhi
+    mfhi $v0
+        
+    # $v1 is the number of books we looked which is just $s4
+    move $v1, $s4
+    
+    # Then we are done with the algorithm
+    
+    finished_add_book_algorithm:
+    # If we are here then we are finish with the function and we can restore all the $s registers we have used
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    lw $s2, 8($sp) # Restoring the $s2 register
+    lw $s3, 12($sp) # Restoring the $s3 register
+    lw $s4, 16($sp) # Restoring the $s4 register
+    lw $s5, 20($sp) # Restoring the $s5 register
+    lw $s6, 24($sp) # Restoring the $s6 register
+    
+    # We also need to restore the return address
+    lw $ra, 28($sp)
+    
+    # Then we can finally deallocate the memory we have used
+    addi $sp, $sp, 28 # Deallocating the 28 bytes we have used
+
+    # And we can return to the caller
     jr $ra
 
 delete_book:
