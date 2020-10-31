@@ -1606,14 +1606,579 @@ hash_booksale:
     # And that's it we can just return to the caller
     jr $ra
 
+determine_leap_year:
+    # This is just a helper function for is_leap_year to determine if the given
+    # integer that represent a year is a leap year
+    
+    # $a0 -> An integer that represent a year
+    # Output -> $v0, 1 if the year is a leap year, 0 if it is not 
+    
+    # 1st in checking
+    # If the year is evenly divisible by 4, then we go to step 2 
+    # if it is not divisible by 4 then it is not a leap year
+    first_step_leap_year_checking:
+    # We will do the divisible here first
+    li $t7, 4 # Load 4 for division
+    
+    # We do the division
+    div $a0, $t7
+    
+    # We only have to check the remainder
+    mfhi $t0
+    
+    # If the year is divisible by 4 then we go to step 2
+    beq $t0, $0, second_step_leap_year_checking
+    
+    # If it is not divisible by 4 then it is definitely not a leap year
+    j not_leap_year_helper
+    
+    second_step_leap_year_checking:
+    # If the year here is also divisble by 100 then we go to step 3
+    # if it is not divislbe by 100 then it is a leap year
+    li $t7, 100
+    
+    # We do the division
+    div $a0, $t7
+    
+    # We just have to check the remainder
+    mfhi $t0
+    
+    # If the year is divisible by 100 then we go to step 3
+    beq $t0, $0, third_step_leap_year_checking
+    
+    # If it is not divislbe by 100 then we know it is a leap year
+    j is_leap_year_helper
+    
+    third_step_leap_year_checking:
+    # If the year here is also disvible by 400 then it is a leap year
+    # otherwise it is not a leap year
+    li $t7, 400
+    
+    # Then we do the division here
+    div $a0, $t7
+    
+    # Again only need remainder
+    mfhi $t0
+    
+    # If the year is divislbe by 400 then it is also a leap year
+    # otherwise it is not a leap year
+    beq $t0, $0, is_leap_year_helper
+    
+    # If it is not divisible by 400 then it is not a leap year
+    j not_leap_year_helper
+    
+    is_leap_year_helper:
+    # If it is a leap year then we just have to return 1
+    li $v0, 1
+    
+    # Then just jump to finish function
+    j finished_determine_leap_year
+    
+    not_leap_year_helper:
+    # If it is not a leap year then we just have to return 0
+    li $v0, 0
+    
+    # Then we can just follow through to return
+    
+    finished_determine_leap_year:
+    # We have nothing to deallocate we can just return to caller    
+    jr $ra 
+
 is_leap_year:
+    # This function determines whether or not the given year is a leap year or
+    # and if it is not a leap year then it will determine the number of years that is
+    # required before the next leap year
+    
+    # $a0 -> An integer that represent the year
+    # Output -> Returns a 0 if the year is before < 1582, and returns a 1 if the given year
+    # is a leap year. And if the year is not a leap year then it returns the negated
+    # until the next leap year
+    
+    # Since we will be calling functions we have to save the arguments
+    # We just need 8 bytes in total so far
+    # 4 more byte for another register
+    addi $sp, $sp, -12 # Allocating 12 bytes of memory on the run time stack
+    
+    # Then we can save the $s registers
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    
+    # Saving the return address
+    sw $ra, 8($sp)
+    
+    # Then we can save the arguments on the $s register
+    move $s0, $a0 # $s0 have the integer that represent the yeare
+    
+    # First things first we have to check if the given year is before 1582 or not
+    # if it is before 1582 < then we just return 0
+    li $t7, 1582
+    
+    # We take this branch if the given year is less than 1582
+    blt $s0, $t7, less_than_1582
+    
+    # Now we have to call determine leap_year to see if the
+    # given year is a leap year or not
+    # $a0 -> The year we want to determine if it is a leap year or not
+    move $a0, $s0
+    
+    # Then we can call the function
+    jal determine_leap_year
+    
+    # In $v0 we have return value of whether or not the given year is a leap
+    # year or not. 0 if it isn't and 1 if it is 
+    # If the return value in $v0 is a 0 then that means the year given
+    # is not a leap year hence we have to use a for loop to find the next
+    # leap year and subtract with the current year to give the difference
+    beq $v0, $0, not_leap_year_determine_difference
+    
+    # However if we are here then that means the given year is indeed
+    # a leap year and we can just return a 1 as our output value
+    li $v0, 1
+    
+    # Then we are essentially done with this algorithm and just have to finish
+    j finished_is_leap_year_algorithm
     
     
+    not_leap_year_determine_difference:
+    # If we are here then that means the given year is not a leap year hence we have
+    # to determine the next leap year and subtract with the given year
+    # to give back a difference
+    
+    # To do this we will be looping through a set of years starting at
+    # given year + 1, and we will be keeping track of that year in $s1
+    addi $s1, $s0, 1 # The given year + 1 is where we will start our search for the next leap year
+    
+    # This for loop will help me find the next leap year
+    for_loop_to_find_next_leap_year:
+        # Our stopping condition will be whenever we find the next leap year
+        # hence we have to call the determine_leap_year function right away
+        # $a0 -> The year we want to determine if it is a leap year, which is just $s1
+        move $a0, $s1
+        
+        # Then we call the function
+        jal determine_leap_year
+        
+        # Now in $v0 we have whether or not it is a leap year
+        # we will break if it is a leap year
+        li $t7, 1
+        
+        # If the search year is indeed a leap year then we stop
+        beq $v0, $t7, finished_finding_next_leap_year
+        
+        # However, if the search year is not a leap year then we will continue the search and
+        # go onto the next year, by adding 1 to it
+        addi $s1, $s1, 1
+        
+        # Then jump back up the loop
+        j for_loop_to_find_next_leap_year
+    
+    finished_finding_next_leap_year:
+    # Now if we are here then in $s1 have the next leap year 
+    # we just have to subtract $s0 - $s1 as our return value because
+    # the instruction want us to return the negated differences
+    sub $v0, $s0, $s1 # given year - the next leap year
+    
+    # Then we are done with the function and we can be finished
+    j finished_is_leap_year_algorithm    
     
     
+    less_than_1582:
+    # If the given year is less than 1582 then we just return 0
+    li $v0, 0
+    
+    # And follow logically to finish up the algorithm
+    
+    finished_is_leap_year_algorithm:
+    # If we are here then we are done with the algorithm
+    # we can start restoring the registers and deallocate the memory
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    
+    # We also need to restore the return address
+    lw $ra, 8($sp) 
+    
+    # Then we can just deallocate the memory that we have used
+    addi $sp, $sp, 12 # Deallocating the 12 byte of memory we have used
+    
+    # And we can return to the caller!
+    jr $ra
+
+date_to_days_helper:
+    # This function takes in a date and count the number of days that have passed since
+    # 1600/1/1
+    
+    # $a0 -> The starting address of the date we want to count the days to
+    # Output -> The number of days elapsed since 1600/1/1
+    
+    # We need to save the argument in $s register because we will be making function calls
+    # 1 argument, 4 bytes, 3 more register 12 bytes and a return address total of 20 bytes
+    addi $sp, $sp, -20 # Allocating 20 bytes of memory in the run time stack
+    
+    # Then we save the $s registers
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 reigser
+    sw $s2, 8($sp) # Saving the $s2 register
+    sw $s3, 12($sp) # Saving the $s3 register
+    
+    # Saving the return address
+    sw $ra, 16($sp)
+    
+    # Then we save the argument that is given
+    move $s0, $a0 # $s0 will be the starting address of the date we are figureing out the days for
+    
+    
+    # The first step is to just grab the year first then we will worry about
+    # the months and the days later. Step by step bruh
+    # The years comes from 0($a0), 1,2,and 3
+    
+    # We will put it into register $t0,1,2 and 3 respective of each ascii digit
+    lbu $t0, 0($s0) # Thousand place
+    lbu $t1, 1($s0) # Hundred place
+    lbu $t2, 2($s0) # Tens place
+    lbu $t3, 3($s0) # Ones place
+    
+    # Next we subtract everything by 48 to get the actual integer value
+    addi $t0, $t0, -48
+    addi $t1, $t1, -48
+    addi $t2, $t2, -48
+    addi $t3, $t3, -48
+     
+    # We will put the year component into $t0
+    # First we need to multiply thousand by 1000
+    li $t7, 1000
+    mul $t0, $t0, $t7 # Multiply thousands place by 1000
+    
+    # Then multiply hundred by 100
+    li $t7, 100
+    mul $t1, $t1, $t7
+    
+    # Tens by 10
+    li $t7, 10
+    mul $t2, $t2, $t7
+    
+    # Ones we don't have to, and we just sum them all up
+    add $t0, $t0, $t1 # Thousand + hundred
+    add $t0, $t0, $t2 # Thousand + hundred + tens
+    add $t0, $t0, $t3 # Thousand + hundred + tens + ones
+    
+    # We move the year we parsed into $s2, this is our stopping condition
+    # for the for loop
+    move $s2, $t0
+    
+    # We will store the counter that starts at 1600 into $s1
+    li $s1, 1600
+    
+    # Then we put the days counter into $s3 to count the total numbner of days that have passed
+    li $s3, 0
+    
+    # Next we will be using a for loop to loop from 1600 to the current year while calling
+    # is_leap_year to sum up all the days of the years that is already passed
+    # We will need a counter which is the year 1600, a stopping condition which is the year we just got
+    # they need to be in $s register because we will be calling is_leap_year
+    for_loop_to_find_total_of_days_passed_since_year:
+        # Let's just do our stopping condition first
+        # which is whenever our counter is greater than or equal to the stopping condition
+        # that means we are done summing all the years that have passed so far
+        bge $s1, $s2, finished_counting_total_of_days_passed_since_year
+    
+        # Now if we are here then that means we haven't finished summing 
+        # the number of days in a year yet, so we have to check if it is a leap year first
+        # if it is a leap year then we add 366 to the day counter $s3, if it is not then we just add 365
+        # $a0 -> The integer year that we want to determine whether it is a year or not which is $s1 our counter
+        move $a0, $s1
+        
+        # Now we can call is_leap_year
+        jal is_leap_year
+        
+        # In $v0 we have 1 if the given year is a leap year, if it is not then it is some negative value
+        li $t7, 1
+        
+        # We take this branch if the return value is 1 because it is a leap year
+        beq $v0, $t7, is_leap_year_add_366
+        
+        # If we don't take the previous branch then it is not a leap year
+        # hence we just have to add 365 to the day counter
+        addi $s3, $s3, 365
+                
+        # And we jump to the next iteration
+        j next_for_loop_total_days_passed_iteration
+        
+        is_leap_year_add_366:
+        # But if it here then we add 366 days instead
+        addi $s3, $s3, 366
+        
+        # And follow logically to the next iteration
+        
+        next_for_loop_total_days_passed_iteration:
+        # Here we increment our year counter
+        addi $s1, $s1, 1
+        
+        # Then jump back up the loop
+        j for_loop_to_find_total_of_days_passed_since_year
+        
+    finished_counting_total_of_days_passed_since_year:
+    # Now if we are here then we have the number of days passed since that year to the given year
+    # without counting the number of days passed in the current year in $s3
+    
+    # Good we have the correct number of days that have passed since 1600 to the current year in $s3
+    # $s1 is basically freed up. $s0 is still our starting address of date string
+    # $s2 is our current year 
+    
+    # Next we have to first know if the current year is a leap year or not
+    # which will determine whether we add 28 or 29 when we are summing the months that has passed
+    # $a0 -> the year we are trying to determine if it is a leap year or not
+    move $a0, $s2 
+    
+    # We call the function
+    jal is_leap_year
+    
+    # Now in $v0 we have whether or not the current year is a leap year
+    # 1 if it is and other value if it is not
+    li $t7, 1
+    
+    # If the current year is a leap year then we allocate 29 in the february place
+    beq $v0, $t7, is_leap_year_array
+    
+    # If we don't take the preivous branch then we allocate 28 in the february placc
+    j is_not_leap_year_array
+    
+    is_leap_year_array:
+    # If it is a leap year then we allocate the array with 29 in february place
+    # We are going to allocate 12 byte of memory on the run time stack
+    # where each byte represent the number of days in the respective month
+    # 0 = january, 1 = february, and so on
+    
+    # And we put 29 into february instead of 28
+    addi $sp, $sp, -12 # Allocating 12 more bytes of additional space on the run time stack
+    
+    # Values to grab from
+    li $t0, 30
+    li $t1, 31
+    li $t2, 29
+    
+    sb $t1, 0($sp) # January
+    sb $t2, 1($sp) # February, 29 days not 28
+    sb $t1, 2($sp) # March
+    sb $t0, 3($sp) # April
+    sb $t1, 4($sp) # May
+    sb $t0, 5($sp) # June
+    sb $t1, 6($sp) # July
+    sb $t1, 7($sp) # August
+    sb $t0, 8($sp) # September
+    sb $t1, 9($sp) # October
+    sb $t0, 10($sp) # November
+    sb $t1, 11($sp) # December
+    
+    # After we allocate the bytes for the months we will jump to sum up all the months that have passed
+    j sum_up_months
+    
+    is_not_leap_year_array:
+    # If it is not a leap year then we allocate the array with 28 in february place
+    # We are going to allocate 12 byte of memory on the run time stack
+    # where each byte represent the number of days in the respective month
+    # 0 = january, 1 = february, and so on
+    
+    addi $sp, $sp, -12 # Allocating 12 more bytes of additional space on the run time stack
+    
+    # Values to grab from
+    li $t0, 30
+    li $t1, 31
+    li $t2, 28
+    
+    sb $t1, 0($sp) # January
+    sb $t2, 1($sp) # February, 29 days not 28
+    sb $t1, 2($sp) # March
+    sb $t0, 3($sp) # April
+    sb $t1, 4($sp) # May
+    sb $t0, 5($sp) # June
+    sb $t1, 6($sp) # July
+    sb $t1, 7($sp) # August
+    sb $t0, 8($sp) # September
+    sb $t1, 9($sp) # October
+    sb $t0, 10($sp) # November
+    sb $t1, 11($sp) # December
+    
+    # We just follow logically to sum up the months that have passed
+    sum_up_months:
+    # If we are here then now we have to grab the months component from the given date
+    # in order to sum it up
+    lbu $t0, 5($s0) # Grab the tens place for months
+    lbu $t1, 6($s0) # Grab the ones place for months
+    
+    # Again we subtract 48 from the ascii value to get actual integer value
+    addi $t0, $t0, -48
+    addi $t1, $t1, -48
+    
+    # Then we just have to multiply things out to get the actual month value
+    li $t7, 10
+    
+    # We multiply the tens place by 10
+    mul $t0, $t0, $t7
+    
+    # Then we just have to add for the ones place
+    add $t0, $t0, $t1
+    
+    # Let's put a counter here for the months we have summed
+    # starting with 1 in $t1, to represent january
+    # The stopping condition is actually the month we grabbed from the date
+    li $t1, 1
+    
+    # If our month is 2 (february), we just sum only january's 31 days and stop at 2
+    # if it is 5(may), we sum 1,2,3,4, but not may because may is not done yet
+    
+    # Now in $t0 we have the months of the current date, we are going to do another
+    # for loop to sum up all the months that have passed since 1/1
+    for_loop_to_sum_up_months_passed:
+        # So let's just do our stopping condition here
+        bge $t1, $t0, finished_sum_up_months_passed
+    
+        # If we are here then that means we haven't finished summing up the months yet
+        # so we have our index $t1, which will help us get the index in the run time stack
+        # if it is 1, then we subtract 1 to get 0 which represent january's days
+        # Let's subtract 1 from our counter and put it into $t2
+        addi $t2, $t1, -1
+        
+        # Then this is our offset to the stack pointer we sum it with $sp to get our effective
+        # address for that month's byte
+        add $t3, $t2, $sp
+        
+        # We load back in the byte into $t4 using $t3 as effective address
+        lb $t4, 0($t3)
+        
+        # Then we just sum it with $s3 our day counter
+        add $s3, $s3, $t4
+        
+        # Then we are done with this iteration, we increment our counter
+        addi $t1, $t1, 1
+    
+        # Then we jump back up the loop
+        j for_loop_to_sum_up_months_passed
+    
+    finished_sum_up_months_passed:
+    # Now don't forget to deallocate the 12 byte we have used else it will be a big trouble
+    addi $sp, $sp, 12
+    
+    # Now if we are here $s3 have the years accounted for and all the months accounted for as well
+    # Okay final step is just to handle the days
+    # We will do the same let's just load in the bytes first from the String
+    lbu $t0, 8($s0) # Load in the tens place
+    lbu $t1, 9($s0) # Load in the ones place
+    
+    # We subtract by 48 again
+    addi $t0, $t0, -48
+    addi $t1, $t1, -49
+    
+    # Then we multiply the tens place by 10
+    li $t7, 10
+    
+    # Multiply tens place by 10
+    mul $t0, $t0, $t7
+    
+    # Then we just have to sum tens place with the ones place
+    add $t0, $t0, $t1
+    
+    # Then finally add this to the day counter and we are finished
+    add $s3, $s3, $t0
+    
+    # We put this into the return value and we are done
+    move $v0, $s3
+    
+    
+    # After finishing the algorithm we have to restore all the $s registers we have used
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 reigser
+    lw $s2, 8($sp) # Restoring the $s2 register
+    lw $s3, 12($sp) # Restoring the $s3 register
+    
+    # Restoring the return address
+    lw $ra, 16($sp)
+    
+    # We have to deallocate the memory we have used
+    addi $sp, $sp, 20 # Deallocating the 20 bytes of memorry we have used
+    
+    # Then we can just jump back to the caller
     jr $ra
 
 datestring_to_num_days:
+    # This function takes in a start and end date and we have to determine the number of days
+    # have elapsed between these two dates
+    
+    # $a0 -> Start date in YYYY-MM-DD format
+    # $a1 -> End date in YYYY-MM-DD format
+    # Output -> $v0, the number of days elapsed from start to end, including end but not end
+    # return -1 if end_date is before start_date
+    
+    # Because we are going to be call we have to save the two arugments
+    # plus two more arguments to store the return days converted and return address
+    # Hence total of 20 bytes on the run time stack
+    addi $sp, $sp, -20
+    
+    # Then we save the $s register
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    sw $s2, 8($sp) # Saving the $s2 register
+    sw $s3, 12($sp) # Saving the $s3 register
+
+    # Then we save the return address
+    sw $ra, 16($sp)
+    
+    # Now we can save the arguments
+    move $s0, $a0 # $s0 will be the start date's address
+    move $s1, $a1 # $s1 will be the end date's address
+    
+    # This is the strategy that we are going to do, we are going to call the helper method that basically
+    # convert each date to number of days have passed since 1600/1/1 and just subtract them
+    # Okay let's convert the start date first
+    # $a0 -> the date to convert
+    move $a0, $s0 # Convert the start date first
+    
+    # Calling the function
+    jal date_to_days_helper
+    
+    # Now we have the days converted in $v0 we save that in $s2
+    move $s2, $v0
+    
+    # We call it again but on the end date
+    # $a0 -> date to convert
+    move $a0, $s1
+    
+    # Calling the functino
+    jal date_to_days_helper
+    
+    # In $v0 we have the end date converted store that into $s3
+    move $s3, $v0
+    
+    # Now we have to compare if end_start is before start_date, start_date is > end_date
+    bgt $s2, $s3, invalid_start_end_date
+    
+    # However if we are here then that means start_end is before end_date
+    # so that means we can just subtract and return the dates elapsed
+    # as our output value
+    sub $v0, $s3, $s2 # end_date - start_date to get our output value
+    
+    # And we are done with this algorithm we can just return
+    j finished_datestring_to_num_days_algorithm
+    
+    invalid_start_end_date:
+    # If we are here then that means end_date is before start_date hence we just return -1
+    li $v0, -1
+    
+    
+    finished_datestring_to_num_days_algorithm:
+    # If we are here then we are done with this algorithm
+    # hence we can start restoring all the $s registers we used
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    lw $s2, 8($sp) # Restoring the $s2 register
+    lw $s3, 12($sp) # Restoring the $s3 register
+
+    # Then we also restore the return address
+    lw $ra, 16($sp)
+    
+    # And deallocate all the memory we have used
+    addi $sp, $sp, 20 # Deallocating the 20 bytes of memory we have used
+    
+    # And we can jump back to the caller
     jr $ra
 
 sell_book:
