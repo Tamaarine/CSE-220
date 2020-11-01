@@ -1,6 +1,6 @@
 # sales hash table contains some entries; a few steps of linear probing required to insert the BookSale struct
 .data
-isbn: .asciiz "9780345501330"
+isbn: .asciiz "9781416971700"
 customer_id: .word 6123
 sale_date: .asciiz "2019-11-04"
 sale_price: .word 1032
@@ -9,7 +9,7 @@ books:
 .word 7 6 68
 # Book struct start
 .align 2
-.ascii "9780345501330\0"
+.ascii "9780345501339\0"
 .ascii "Fairy Tail, Vol. 1 (Fair\0"
 .ascii "Hiro Mashima, William Fl\0"
 .word 1
@@ -59,21 +59,13 @@ sales:
 .byte 69 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 # BookSale struct start
 .align 2
-.ascii "9780060855900\0"
-.byte 0 0
-.word 920192
-.word 158610
-.word 61
+.byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 # BookSale struct start
 .align 2
-.ascii "9780345501330\0"
-.byte 0 0
-.word 81321
-.word 151269
-.word 192
+.byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 # empty or deleted entry starts here
 .align 2
-.byte 0 69 69 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+.byte 69 69 69 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 # BookSale struct start
 .align 2
 .ascii "9780312577220\0"
