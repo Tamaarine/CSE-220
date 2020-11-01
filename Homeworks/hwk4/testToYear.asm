@@ -1,13 +1,9 @@
 .data
-year: .asciiz "2016-12-18"
+year: .byte 0
 
 
 .text
-la $a0, year
-jal date_to_days_helper
 
-li $v0, 10
+li $a0, '-'
+li $v0, 1
 syscall
-
-
-.include "hwk4.asm"

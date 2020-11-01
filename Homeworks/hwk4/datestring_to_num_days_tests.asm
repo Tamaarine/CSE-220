@@ -1,16 +1,16 @@
-.data
+.data # PASSED
 start_date: .asciiz "2020-10-12"
 end_date: .asciiz "2020-10-25"
 
-.data
+.data # PASSED
 start_date: .asciiz "2020-10-25"
 end_date: .asciiz "2020-10-12"
 
-.data
+.data # PASSED
 start_date: .asciiz "2019-10-25"
 end_date: .asciiz "2020-10-25"
 
-.data
+.data # PASSED
 start_date: .asciiz "1692-11-28"
 end_date: .asciiz "2602-09-13"
 

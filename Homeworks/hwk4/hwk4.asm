@@ -2182,6 +2182,524 @@ datestring_to_num_days:
     jr $ra
 
 sell_book:
+    # This function attempts to insert the given book isbn into the sales
+    # HashTable which is array of BookSale struct, it also update the number of times_sold
+    # in the books HashTable
+    
+    # $a0 -> HashTable with BookSale struct
+    # $a1 -> HashTable with book struct
+    # $a2 -> ISBN, the 13 char null terminated String
+    # $a3 -> The integer that represent the customer's id
+    # 0($sp) -> The 10 character null terminated String that represent a date
+    # on or after 1600/1/1
+    # 4($sp) -> The integer that represent price for the book
+    # Output -> $v0, the index where the book is inserted, -1 if full HashTable, -2 if the ISBN don't exist in books
+    # Output -> $v1, the number of books accessed before is inserted, -1 if full HashTable, -2 if the ISBN don't exist in books
+    
+    # We have a pointer to the stack before we move it so we have access to
+    # the argument that is provided to us from the caller
+    move $t0, $sp
+    
+    # Now we are going to be calling alot of functions so we need to save these arguments
+    # 6 arguments so 24 bytes, plus 4 more for the return address so total of 28 bytes
+    # add another 8 byte for 2 more reigster
+    addi $sp, $sp, -36 # Allocating 36 bytes on the run time stack
+    
+    # Saving the $s registers
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    sw $s2, 8($sp) # Saving the $s2 register
+    sw $s3, 12($sp) # Saving the $s3 register
+    sw $s4, 16($sp) # Saving the $s4 register
+    sw $s5, 20($sp) # Saving the $s5 register
+    sw $s6, 24($sp) # Saving the $s6 register
+    sw $s7, 28($sp) # Saving the $s7 register
+    
+    
+    # Then we also need to save the return address
+    sw $ra, 32($sp)
+    
+    # Now we can save the arugments
+    move $s0, $a0 # $s0 have the HashTable BookSale struct
+    move $s1, $a1 # $s1 have the HashTable book struct
+    move $s2, $a2 # $s2 have the ISBN null terminated String's starting address
+    move $s3, $a3 # $s3 have the integer that represent the customer's id
+    lw $s4, 0($t0) # $s4 have the starting address that represent the date
+    lw $s5 4($t0) # $s5 have the integer that represent the price of the book
+    
+    # Now we will begin our algorithm
+    # First we check if sales HashTable is full, size == capacity, if it is then we just return (-1,-1)
+    lw $t0, 0($s0) # Load in the capacity of sales HashTable
+    lw $t1, 4($s0) # Loading in the size of sales HashTable
+    
+    # We take this branch if the sale's HashTable is full
+    beq $t0, $t1, full_sales_hashtable
+    
+    # Now if we are here then that means the HashTable isn't full yet hence we have to check next
+    # if the given ISBN is even in the books HashTable, if it don't exist then we return (-2, -2)
+    # We can check if the book exist by calling get_book
+    # $a0 -> The book HashTable
+    # $a1 -> The book ISBN we are looking for
+    move $a0, $s1 # The book struct
+    move $a1, $s2 # The book we are looking for
+    
+    # Then we can call the function
+    jal get_book
+    
+    # Now in $v0 we have -1 if the book is not found or
+    # other value if the book is indeed found
+    li $t7, -1
+    
+    # We take this branch if the book we are trying to record a sale
+    # don't even exist in the books HashTable
+    beq $v0, $t7, book_not_found_in_book_hashtable
+    
+    # However, if we are here then that means the book does indeed exist and the
+    # booksale HashTable isn't full yet hence we have to proceed to insert the BookSale
+    # struct into its correct place
+    
+    # We have to find the place where we are putting the struct and we can figure that out
+    # by calling hash_booksale(sales, isbn, customer_id)
+    # $a0 -> The HashTable that contains sales struct
+    # $a1 -> The ISBN
+    # $a2 -> Customer's ID
+    move $a0, $s0
+    move $a1, $s2
+    move $a2, $s3
+    
+    # Then we can call the hash_booksale function
+    jal hash_booksale
+    
+    # We should save that expected location index into $s7 just so that we don't lose it
+    move $s7, $v0 
+    
+    # In $s7 we have where the expected location where we are putting the book in the
+    # booksale HashTable. Let the hell begin with insertion and linear probing
+    # But the question was nice enough to only have valid book or empty book
+    # there is no entry that is deleted hence we only have 1 case for the expected location
+    
+    # Now let's start, we begin by calculating the effective address of where that book is
+    # at that index. The formula will just be 12($base_address) + index * 28 to get the effective address of a sale at the given index
+    # We store 12($base_address) into $t0 first
+    addi $t0, $s0, 12 # This get us to the array of booksales
+    
+    # Then we load in 28 for multiplication
+    li $t7, 28
+    
+    # And we multiply the expected location index with 28, we store that into $t1
+    mul $t1, $s7, $t7 # index * 28
+    
+    # And we just have to add it into $t0
+    add $t0, $t0, $t1
+    
+    # We should save the effective address of the expected location in the HashTable
+    # into one of the $s registers $s6
+    move $s6, $t0 # Storing the effective address of the place where we are putting the sales
+
+    
+    # Now in $s6 we have the effective address of the expected location where the booksales struct go
+    # we grab the first byte by doing lbu for checking empty or is already booked, we grab the byte
+    # and put it into $t1
+    lbu $t1, 0($s6)
+    
+    # Now we check if the byte is 0 then we have an empty expected location which we can just insert the book into
+    # easily without any more work. But if the byte is not 0 then we are screwed and we have to do linear probing
+    beq $t1, $0, probing_not_needed
+    
+    # However, if we are here then that means probing to find a place to insert the booksale
+    # struct is required
+    j insert_booksale_probing_needed
+    
+    
+    probing_not_needed:
+    # If we are here then we can just put the booksale struct into the expected location
+    # because it is an empty. Keep in mind that $s6 is the effective address of where
+    # we are putting the booksale struct
+    
+    # Sooo first things first, we copy in the 14 bytes of ISBN into the book sale struct
+    # $a0 -> The place where we are copying the ISBN to which is just $s6
+    # $a1 -> The place where we are copying the ISBN from which is just $s2
+    # $a2 -> The number of bytes we are copying which is 14 bytes
+    move $a0, $s6
+    move $a1, $s2
+    li $a2, 14 # 14 bytes of memory we are copying
+    
+    # And we call the method to copy the ISBN
+    jal memcpy
+    
+    # After copying the 14 bytes of ISBN, we have to add two byte of paddings
+    # that have value of 0, and we do it at index 14 and 15
+    sb $0, 14($s6) # Store a 0 in the padding
+    sb $0, 15($s6) # Store a 0 in the padding
+    
+    # Next we also need to copy in the 4 byte customer id
+    # we will just do that by doing sw at the 16($s6) position
+    sw $s3, 16($s6) # Putting the customer id into the proper word position
+    
+    # Next we have to calculate the number of days elapsed between the given date
+    # and 1600/1/1, we can find that by calling the function datestring_to_num_days
+    # Okay the most logical way of giving 1600-01-01 into the function parameter is to
+    # allocate 10 bytes + 2 byte for null terminating the date on the run time stack and to make it word aligned
+    # and pass the run time stack as the argument 
+    addi $sp, $sp, -12 # Allocate 12 bytes of memory on the run time stack
+    
+    # Then here is where we store the ascii value value into each 
+    # 1600 = 49 54 48 48
+    # -01-01 = 45 48 49 45 48 49
+    # Keep in mind to null terminate the last two bit just in case
+    li $t0, '1'
+    li $t1, '6'
+    li $t2, '0'
+    li $t3, '-'
+    
+    sb $t0, 0($sp) # 1
+    sb $t1, 1($sp) # 6
+    sb $t2, 2($sp) # 0
+    sb $t2, 3($sp) # 0
+    sb $t3, 4($sp) # -
+    sb $t2, 5($sp) # 0
+    sb $t0, 6($sp) # 1
+    sb $t3, 7($sp) # -
+    sb $t2, 8($sp) # 0
+    sb $t0, 9($sp) # 1
+    sb $0, 10($sp) # Null terminator
+    sb $0, 11($sp) # Null terminator
+    
+    # Then we pass in the stack pointer for datestring_to_num_days
+    # $a0 -> Start date just the stack pointer
+    # $a1 -> End date
+    move $a0, $sp # 1600-01-01
+    move $a1, $s4 # The given date
+    
+    # Then we can call the function 
+    jal datestring_to_num_days
+    
+    # We need to deallocate the 12 btyes we have used
+    addi $sp, $sp, 12 # Deallocating the 12 bytes we have temporarily used
+    
+    # Now in $v0 we have the number of days have elapsed
+    # we store that word into 20($s6)
+    sw $v0, 20($s6)
+    
+    # Lastly, we have to store the store_price into 24($s6)
+    sw $s5, 24($s6)
+    
+    # And we have to increment size element in the book struct
+    # Now we have to figure out where that ISBN book is in the book struct
+    # in order to increment it we can do so that calling get_book again
+    # $a0 -> The book struct we are searching the book in
+    # $a1 -> The ISBN we are searching for
+    move $a0, $s1
+    move $a1, $s2
+    
+    # Then we can call the get_book function
+    jal get_book
+    
+    # Now in $v0 we have the index where the book belongs
+    # we have to calculate the effective address of that book in order to increment
+    # the number of times that book was sold
+    # 12($base_address) + index * 68
+    # Let's load 12($base_address) into $t0
+    addi $t0, $s1, 12
+    
+    # Load 68 for multiplication
+    li $t7, 68
+    
+    # Then we multiply index * 68 and put it into $t1
+    mul $t1, $v0, $t7
+    
+    # Then we add the offset to the array address
+    add $t0, $t0, $t1
+    
+    # Now in $t0 we have the effective starting address where the book is
+    # we have to grab the times_sold which is at 64($t0)
+    lw $t1, 64($t0)
+    
+    # We increment it by one
+    addi $t1, $t1, 1
+    
+    # And we store it back in the same locaiton
+    sw $t1, 64($t0)
+    
+    # Andddd we are finally freaking done
+    # the return value is in $s7 for $v0
+    # the return value $v1 is 1
+    move $v0, $s7 # The index where the booksale struct is stored
+    li $v1, 1 # Number of books accessed before it is place
+    
+    # Hold up before we call it done we also need to increment the size of the booksales HashTable
+    # Let's load in the current size into $t0
+    lw $t0, 4($s0)
+    
+    # We increment it by 1
+    addi $t0, $t0, 1
+    
+    # Then we put that back in
+    sw $t0, 4($s0)
+    
+    # Then we can call it done
+    
+    
+    # And we can return and finished
+    j finished_sell_book_algorithm    
+    
+    
+    insert_booksale_probing_needed:
+    # If we are here then linear probing is required because there is a book in the expected
+    # location already, starting at index $s7 + 1
+    # $s0 have the HashTable BookSale struct
+    # $s1 have the HashTable book struct
+    # $s2 have the ISBN null terminated String's starting address
+    # $s3 have the integer that represent the customer's id
+    # $s4 have the starting address that represent the date
+    # $s5 have the integer that represent the price of the book
+    # $s7 have the expected index, but we need to increment by 1 to start after it, because expected location have a book already
+    # We can use $s6 for counting the number of books we have looked starting at 1
+    li $s6, 1
+    
+    # We have to increment $s7 by 1 because that is the next index we are looking at
+    addi $s7, $s7, 1
+    
+    # We don't need a stopping condition because we are guaranteed to have a free space to put the book during probing
+    # Now let's begin a for loop of doom
+    for_loop_for_booksale_probing:
+        # Now let's get the index we are checking the place to put the sales in
+        # we have to mod $s7 by the capacity in order to find the index we are looking at
+        # Let's get the capacity from the struct which is located at 0($s0) and load into $t0
+        lw $t0, 0($s0) # Capacity
+        
+        # Now we have to div the $s7 by $t0
+        div $s7, $t0
+        
+        # Let's get the index by doing mfhi and put into $t0
+        mfhi $t0
+        
+        # In $t0 we have the index where to check if it is available
+        # We have to use the formula 12($base_address) + index * 28 to get to that booksale address
+        # We will store 12($base_address) into $t1
+        addi $t1, $s0, 12
+        
+        # We load in 68 for multiplication
+        li $t7, 28
+        
+        # Then we multiply the index by 28 and store into $t2
+        mul $t2, $t0, $t7
+        
+        # Now we add together the array address with the offset and put into $t1
+        add $t1, $t1, $t2
+        
+        # Now we have the effective address of that sales struct, we get the first byte
+        # if it is empty then we break out, if it is not empty then we have to keep checking
+        lbu $t2, 0($t1)
+        
+        # We take this branch if the first byte is empty meaning that this particular index is good for storing our
+        # sales struct 
+        beq $t2, $0, found_empty_space_for_booksales_struct
+        
+        # However if it is not empty then we have to check the next book
+        # We increment the $s7 index counter
+        addi $s7, $s7, 1
+        
+        # We also need to increment the total book accessed counter
+        addi $s6, $s6, 1
+        
+        # Then jump back up the loop
+        j for_loop_for_booksale_probing
+        
+    
+    found_empty_space_for_booksales_struct:
+    # Now in $t0 we have the index where the book is to be placed
+    # And in $t1 we have the effective address of where the book needs to go
+    # we have to add one more to the access count number because after we exit it didn't count that current book
+    addi $s6, $s6, 1
+    
+    # Now we don't need $s7 counter anymore we will replace it with the index that we have placed the book in
+    # which is $t0
+    move $s7, $t0
+    
+    
+    
+    # Okay we have our effective address of where the book needs to go
+    # Okay before we free up $s0 register we have to increment the size of HashTable sales
+    # Let's load in the current size first
+    lw $t0, 4($s0)
+    
+    # We increment it by 1
+    addi $t0, $t0, 1
+    
+    # Then we put that back where it needs to be
+    sw $t0, 4($s0)
+    
+    # Okay I might need to store $s0 in the stack first
+    addi $sp, $sp, -4 # Allocate 4 bytes on the run time stack to store $s0
+    
+    # We preserve this current $s0 on the stack and make sure we restore it after
+    sw $s0, 0($sp)
+    
+    # Okay then $s0 is now free up we can use that to store the effective aaddress of where the book need to go
+    move $s0, $t1
+    
+    
+    # First step we have to copy over the ISBN
+    # $a0 -> The place where we are copying the isbn to
+    # $a1 -> The ISBN we are copying from
+    # $a2 -> 14 bytes
+    move $a0, $s0
+    move $a1, $s2
+    li $a2, 14
+    
+    # Now we can call memcpy to copy over
+    jal memcpy
+    
+    # Okay ISBN is copied over we need to provide 2 byte of padding at
+    # 14($s0) and 15($s0)
+    sb $0, 14($s0)
+    sb $0, 15($s0)
+    
+    # Next we have to store the customer_id at 16($s0)
+    sw $s3, 16($s0) # Store the customer id at the proper place
+    
+    # Okay now we must compute sales date 
+    addi $sp, $sp, -12 # Allocate 12 bytes of memory on the run time stack
+    
+    # Then here is where we store the ascii value value into each 
+    # 1600 = 49 54 48 48
+    # -01-01 = 45 48 49 45 48 49
+    # Keep in mind to null terminate the last two bit just in case
+    li $t0, '1'
+    li $t1, '6'
+    li $t2, '0'
+    li $t3, '-'
+    
+    sb $t0, 0($sp) # 1
+    sb $t1, 1($sp) # 6
+    sb $t2, 2($sp) # 0
+    sb $t2, 3($sp) # 0
+    sb $t3, 4($sp) # -
+    sb $t2, 5($sp) # 0
+    sb $t0, 6($sp) # 1
+    sb $t3, 7($sp) # -
+    sb $t2, 8($sp) # 0
+    sb $t0, 9($sp) # 1
+    sb $0, 10($sp) # Null terminator
+    sb $0, 11($sp) # Null terminator
+    
+    # Then we pass in the stack pointer for datestring_to_num_days
+    # $a0 -> Start date just the stack pointer
+    # $a1 -> End date
+    move $a0, $sp # 1600-01-01
+    move $a1, $s4 # The given date
+    
+    # Then we can call the function 
+    jal datestring_to_num_days
+    
+    # We need to deallocate the 12 btyes we have used
+    addi $sp, $sp, 12 # Deallocating the 12 bytes we have temporarily used
+    
+    # In $v0 we have the number of days that is passed and we need to store that into
+    # where date of sales in #days which is at 20($s0)
+    sw $v0, 20($s0)
+    
+    # Lastly we store the sale_price at 24($s0)
+    sw $s5, 24($s0)
+    
+    # Good everything is stored now we need to increment the times_sold in the book struct
+    # We need to get the index of where that book is by calling get_book again
+    # $a0 -> The book struct we are searching the book in
+    # $a1 -> The ISBN we are searching for
+    move $a0, $s1
+    move $a1, $s2
+    
+    # Then we call get_book function
+    jal get_book
+    
+    # In $v0 we have the index where the book belongs
+    # we have to find the effective address of that  book in oreder to increment the number of times sold
+    # We get to the starting address of the array
+    addi $t0, $s1, 12
+    
+    # Load 68 for mult
+    li $t7, 68
+    
+    # Multiply the index with 68 and put into $t1
+    mul $t1, $v0, $t7
+    
+    # Then we add offset to the array address
+    add $t0, $t0, $t1
+    
+    # Now in $t0 we have the effective starting address of where the book is
+    # we grab the times sold at 64($t0)
+    lw $t1, 64($t0)
+    
+    # Increment by 1
+    addi $t1, $t1, 1
+    
+    # Then we store it back in the same locaiton
+    sw $t1, 64($t0)
+    
+    # And we have to also increment the size of the booksales HashTable
+    # And here is when we restore our $s0 register
+    lw $s0, 0($sp)
+    # Deallocate the 4 byte we have used
+    addi $sp, $sp, 4
+    
+    # We get the size from the booksales HashTable
+    lw $t0, 4($s0)
+    
+    # Increment by 1
+    addi $t0, $t0, 1
+    
+    # Then we put it back in
+    sw $t0, 4($s0)
+    
+    # And we have to move in the output
+    # in $v0 we have the index it is stored
+    # which is just $s7
+    # for $v1 the number of moves it took is in $s6
+    move $v0, $s7
+    move $v1, $s6
+    
+    # And we can call it done finally
+    j finished_sell_book_algorithm
+
+    
+    
+    book_not_found_in_book_hashtable:
+    # If we are here then that means the book don't even exist
+    # we just return (-2, -2) and finished
+    li $v0, -2
+    li $v1, -2
+
+    # Then we are done with the algorithm
+    j finished_sell_book_algorithm
+    
+    full_sales_hashtable:
+    # If we are here then that means the sales HashTable is full we can't insert anymore
+    # book sales into the table hence we just reutrn (-1, -1)
+    li $v0, -1
+    li $v1, -1
+    
+    # Then we can just follow the next logical line to return
+    
+    finished_sell_book_algorithm:
+    # If we are here then we are done with the algorithm we can start restoring the
+    # $s registers we have used
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    lw $s2, 8($sp) # Restoring the $s2 register
+    lw $s3, 12($sp) # Restoring the $s3 register
+    lw $s4, 16($sp) # Restoring the $s4 register
+    lw $s5, 20($sp) # Restoring the $s5 register
+    lw $s6, 24($sp) # Restoring the $s6 register
+    lw $s7, 28($sp) # Restoring the $s7 register
+    
+    # Then we also need to Restoring the return address
+    lw $ra, 32($sp)
+    
+    # Then finally deallocate the memory we have used
+    addi $sp, $sp, 36 # Deallocating the 36 bytes of memory we have used
+    
+    
     jr $ra
 
 compute_scenario_revenue:

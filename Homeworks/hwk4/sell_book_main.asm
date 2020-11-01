@@ -1,8 +1,9 @@
+# sales hash table contains some entries; a few steps of linear probing required to insert the BookSale struct
 .data
-isbn: .asciiz "9780670032080"
-customer_id: .word 12345
-sale_date: .asciiz "2020-09-14"
-sale_price: .word 50
+isbn: .asciiz "9780345501330"
+customer_id: .word 6123
+sale_date: .asciiz "2019-11-04"
+sale_price: .word 1032
 books:
 .align 2
 .word 7 6 68
@@ -11,10 +12,10 @@ books:
 .ascii "9780345501330\0"
 .ascii "Fairy Tail, Vol. 1 (Fair\0"
 .ascii "Hiro Mashima, William Fl\0"
-.word 3
+.word 1
 # empty or deleted entry starts here
 .align 2
-.byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+.byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 # Book struct start
 .align 2
 .ascii "9780060855900\0"
@@ -32,13 +33,13 @@ books:
 .ascii "9780064408330\0"
 .ascii "Joey Pigza Swallowed the\0"
 .ascii "Jack Gantos\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-.word 45
+.word 44
 # Book struct start
 .align 2
 .ascii "9780312577220\0"
 .ascii "Fly Away (Firefly Lane, \0"
 .ascii "Kristin Hannah\0\0\0\0\0\0\0\0\0\0\0"
-.word 814
+.word 812
 # Book struct start
 .align 2
 .ascii "9781416971700\0"
@@ -46,72 +47,52 @@ books:
 .ascii "Sharon M. Draper\0\0\0\0\0\0\0\0\0"
 .word 1
 
+
 sales:
 .align 2
-.word 9 9 28
+.word 9 4 28
+# empty or deleted entry starts here
+.align 2
+.byte 69 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 # BookSale struct start
 .align 2
-.ascii "9780345501330\0"
-.byte 0 0
-.word 723341
-.word 155332
-.word 55
-# BookSale struct start
-.align 2
-.ascii "9781416971700\0"
-.byte 0 0
-.word 2323432
-.word 155136
-.word 22
+.byte 69 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 # BookSale struct start
 .align 2
 .ascii "9780060855900\0"
 .byte 0 0
 .word 920192
-.word 158715
+.word 158610
 .word 61
 # BookSale struct start
 .align 2
 .ascii "9780345501330\0"
 .byte 0 0
 .word 81321
-.word 151369
+.word 151269
 .word 192
-# BookSale struct start
+# empty or deleted entry starts here
 .align 2
-.ascii "9780312577220\0"
-.byte 0 0
-.word 777233
-.word 155332
-.word 55
+.byte 0 69 69 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
 # BookSale struct start
 .align 2
 .ascii "9780312577220\0"
 .byte 0 0
 .word 2424
-.word 152013
+.word 151912
 .word 125
-# BookSale struct start
+# empty or deleted entry starts here
 .align 2
-.ascii "9780345501330\0"
-.byte 0 0
-.word 26234
-.word 155332
-.word 55
-# BookSale struct start
+.byte 69 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+# empty or deleted entry starts here
 .align 2
-.ascii "9780312577220\0"
-.byte 0 0
-.word 12312
-.word 155332
-.word 55
-# BookSale struct start
+.byte 69 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 13 13 13 13 
+# empty or deleted entry starts here
 .align 2
-.ascii "9780064408330\0"
-.byte 0 0
-.word 73123
-.word 155332
-.word 55
+.byte 69 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+
+
 
 .text
 .globl main
@@ -128,8 +109,27 @@ sw $t1, 4($sp)
 li $t0, 929402 # garbage
 li $t1, 6322233 # garbage
 jal sell_book
+addi $sp, $sp, 8
 
 # Write code to check the correctness of your code!
+move $t0, $v0
+move $t1, $v1
+
+# Print out index where it is placed
+move $a0, $t0
+li $v0, 1
+syscall
+
+
+li $a0, ' '
+li $v0, 11
+syscall
+
+move $a0, $t1
+li $v0, 1
+syscall
+
+
 li $v0, 10
 syscall
 
