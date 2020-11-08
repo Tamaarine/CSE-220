@@ -2,14 +2,13 @@
 customer: .word 69
 
 .text
-lw $a0, customer
-li $v0, 1
+li $t0, 13
+
+sub $a0, $0, $t0
+li $v0,1
 syscall
 
 
-addi $a0, $a0, -1
-li $v0, 1
-syscall
 
 
 

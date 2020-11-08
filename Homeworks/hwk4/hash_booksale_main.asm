@@ -1,3 +1,4 @@
+# Test case #3
 .data
 books: .align 2
 .word 19 0 68

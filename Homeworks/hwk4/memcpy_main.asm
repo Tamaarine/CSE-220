@@ -1,3 +1,4 @@
+# Invalid argument
 .data
 .align 2
 n: .word 0
@@ -9,6 +10,15 @@ dest: .ascii "XXXXXXX"
 .text
 .globl main
 main:
+li $s0, 699
+li $s1, 699
+li $s2, 699
+li $s3, 699
+li $s4, 699
+li $s5, 699
+li $s6, 699
+li $s7, 699
+
 la $a0,  dest
 la $a1,  src
 lw $a2,  n

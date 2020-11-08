@@ -2,15 +2,27 @@
 .data
 .align 2
 capacity: .word -3
-element_size: .word 28
+element_size: .word 68
 hashtable:
 .word 1745499 # capacity
 .word 92751585 # size
 .word 14266421 # element_size
 
+
+
+
 .text
 .globl main
 main:
+li $s0, 699
+li $s1, 699
+li $s2, 699
+li $s3, 699
+li $s4, 699
+li $s5, 699
+li $s6, 699
+li $s7, 699
+
 la $a0, hashtable
 lw $a1, capacity
 lw $a2, element_size

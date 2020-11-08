@@ -1,7 +1,7 @@
 # Test case #1
 .data
 num_sales: .word 5
-scenario: .word 12
+scenario: .word 31
 .align 2
 sales_list:
 # BookSale struct start

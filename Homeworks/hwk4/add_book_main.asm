@@ -1,3 +1,4 @@
+# Add book to hash table with existing values; multiple "deleted" slots
 .data
 isbn: .asciiz "9780451230230"
 title: .asciiz "The Pacific"
@@ -38,8 +39,6 @@ books:
 .ascii "Out of My Mind\0\0\0\0\0\0\0\0\0\0\0"
 .ascii "Sharon M. Draper\0\0\0\0\0\0\0\0\0"
 .word 0
-
-
 
 
 .text

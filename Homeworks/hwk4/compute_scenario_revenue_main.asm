@@ -95,7 +95,6 @@ sales_list:
 .word 48218
 .word 1291
 .word 474
- 
 
 
 

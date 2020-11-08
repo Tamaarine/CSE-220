@@ -1,3 +1,4 @@
+# Attempt to delete a book not present in the hash table; hash table is full
 .data
 isbn: .asciiz "9780802122550"
 books:

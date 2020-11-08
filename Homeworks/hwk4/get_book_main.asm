@@ -1,3 +1,4 @@
+# Get a book that is present in the hash table at a probed index; one or more available slots encountered during probing
 .data
 isbn: .asciiz "9780316905750"
 books:
@@ -5,7 +6,10 @@ books:
 .word 7 7 68
 # Book struct start, 0
 .align 2
-.byte 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+.ascii "9780316905750\0"
+.ascii "Moreta: Dragonlady of Pe\0"
+.ascii "Anne McCaffrey\0\0\0\0\0\0\0\0\0\0\0"
+.word 0
 # Book struct start, 1
 .align 2
 .ascii "9780316905750\0"
@@ -42,8 +46,6 @@ books:
 .ascii "Out of My Mind\0\0\0\0\0\0\0\0\0\0\0"
 .ascii "Sharon M. Draper\0\0\0\0\0\0\0\0\0"
 .word 0
-
-
 
 
 
