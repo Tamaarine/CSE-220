@@ -1,3 +1,4 @@
+# Append an item to a short list
 .data
 card_num: .word 6570802
 .align 2
@@ -20,14 +21,46 @@ node253109:
 .word 7685168
 .word node411020
 
+
 .text
 .globl main
 main:
+li $s0, 699
+li $s1, 699
+li $s2, 699
+li $s3, 699
+li $s4, 699
+li $s5, 699
+li $s6, 699
+li $s7, 699
+
 la $a0, card_list
 lw $a1, card_num
 jal append_card
 
+la $a0, card_list
+lw $a1, card_num
+jal append_card
+
+la $a0, card_list
+lw $a1, card_num
+jal append_card
+
+la $a0, card_list
+lw $a1, card_num
+jal append_card
+
+la $a0, card_list
+lw $a1, card_num
+jal append_card
+
+
 # Write code to check the correctness of your code!
+# Print the size
+move $a0, $v0
+li $v0,1
+syscall
+
 li $v0, 10
 syscall
 
