@@ -140,6 +140,129 @@ append_card:
    jr $ra
 
 create_deck:
+   # This function creates a new card_list that have a total of 80 play cardss going from
+   # 0x00645330 to 0x00645339 repeated total of 8 times
+   
+   # Output -> $v0, returns the card_list's address that have the 80 cards
+   
+   # Since we are going to be calling functions we have to save the return address
+   # which will be 4 bytes. Add on another 20 bytes for total of 5 reigsters
+   # hence total of 24 bytes
+   addi $sp, $sp, -24 # Allocating 24 bytes of memory on the run time stack
+   
+   # Then we have to save the $s registers before we can use them
+   sw $s0, 0($sp) # Saving the $s0 register
+   sw $s1, 4($sp) # Saving the $s1 register
+   sw $s2, 8($sp) # Saving the $s2 register
+   sw $s3, 12($sp) # Saving the $s3 register
+   sw $s4, 16($sp) # Saving the $s4 register
+   
+   # Saving the return address or else it won't know where to return
+   sw $ra, 20($sp)   
+            
+   # Now we have to allocate 8 bytes of memory on the heap stack which will be used
+   # to store the card_list struct, and used for calling init_list
+   # We will be allocating that heap memory by doing syscall 9
+   li $a0, 8 # Allocating 8 bytes of memory hence we put 8
+   li $v0, 9 # Syscall for allocating memory on the heap
+   syscall 
+   
+   # Now in $v0 we have the address of where that 8 byte memory start 
+   # we will move that into $s0 to prevent losing it
+   move $s0, $v0
+   
+   # Now before we can start adding those cards
+   # we must initalize the card_list by calling init_list
+   # $a0 -> The card_list that we want to initalize which is just $s0
+   move $a0, $s0 # $a0 is the card_list that we want to initalize
+   
+   # Then we can call the function to actually initalize it
+   jal init_list
+   
+   
+   # Then next in order to add those 80 cards we need a for loop
+   # that will be looping total of 80 times
+   # $s1 will be our counter for the number of times we have added the cards
+   li $s1, 0
+   
+   # $s2 will be our stopping condition which is whenever the card counter is greater than
+   # or equal to 80 
+   li $s2, 10
+   
+   # Then we have our card counter which will start on 0x00645330
+   li $s3, 0x00645330
+   
+   # And the card to start looping back around whenever our card counter hits the
+   # last card which is just 0x00645339
+   li $s4, 0x00645339
+   
+   # Now we can begin our for loop to append these 
+   for_loop_to_append_80_cards:
+   	# Let's just get our stopping conditions out of the way
+   	# which is whenever our counter for the number of cards is greater than or equal to 80
+   	# that means we have append total of 80 cards already
+   	beq $s1, $s2, finished_for_loop_to_append_80_cards
+   	
+   	# However, if we are here then that means we haven't finish appending the 80 cards yet
+   	# and we have to append it right here
+   	# Now right here we have to call append_card
+   	# $a0 -> The card_list we are appending our cards to and is $s0
+   	# $a1 -> The card we are appending which is just $s3
+   	move $a0, $s0 # The card_list we are appending the card to
+   	move $a1, $s3 # The card we are appending 
+   	
+   	# Then we can call the function append_card
+   	jal append_card
+   	
+   	# Now after we append the card we have to increment our counter
+   	# First our card number appended counter to signal that we have just append a card
+   	addi $s1, $s1, 1
+   	
+   	# Then we also have to increment our card counter but we have to check
+   	# whether or not the current card counter is the max, if it is max
+   	# we have to loop back to 0x00645330
+   	# So if we take this branch then that means our current card counter is at
+   	# the last card, so we have to loop back around in order to increment it
+   	beq $s3, $s4, loop_back_around_for_card_counter
+   	
+   	# However, if we are here then that means the current card counter isn't
+   	# at max yet hence we just have to add 1 to the current card counter that's it
+   	addi $s3, $s3, 1
+   	
+   	# And we jump to the next iteration
+   	j next_append_80_card_iteration
+   	
+   	loop_back_around_for_card_counter:
+   	# If we are here then we have to loop back to the start of the card counter 
+   	# which is the first card, 0x00645330
+   	li $s3, 0x00645330
+   	
+   	next_append_80_card_iteration:
+   	# If we are here then we jump back up the loop for the next iteration
+   	j for_loop_to_append_80_cards
+   	
+   finished_for_loop_to_append_80_cards:
+   # Now if we are here then we have total of 80 cards appended to the card_list
+   # Our return value is just $s0 the starting address of card_list struct
+   move $v0, $s0
+   
+   # Andddd we are essentially done with the algorithm and we can start
+   # restoring the registers and deallocating the memory
+   
+   # Restoring the $s registers we have used
+   lw $s0, 0($sp) # Restoring the $s0 register
+   lw $s1, 4($sp) # Restoring the $s1 register
+   lw $s2, 8($sp) # Restoring the $s2 register
+   lw $s3, 12($sp) # Restoringing the $s3 register
+   lw $s4, 16($sp) # Restoring the $s4 register
+   
+   # We also have to restore the return address or else create_deck won't know where to return to
+   lw $ra, 20($sp) 
+   
+   # Then we deallocate the memory we have used
+   addi $sp, $sp, 24 # Deallocating the 24 bytes of memory we have used
+   
+   # And finally we can jump back to the caller
    jr $ra
 
 deal_starting_cards:
