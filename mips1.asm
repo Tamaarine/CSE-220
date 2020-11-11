@@ -1,5 +1,5 @@
 .data
-hello: .ascii "Hello World"
+hi: .word 7684917
 
 .text
 # We load positive 8 into our register $t1

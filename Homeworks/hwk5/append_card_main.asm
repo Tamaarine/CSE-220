@@ -39,20 +39,7 @@ lw $a1, card_num
 jal append_card
 
 la $a0, card_list
-lw $a1, card_num
-jal append_card
-
-la $a0, card_list
-lw $a1, card_num
-jal append_card
-
-la $a0, card_list
-lw $a1, card_num
-jal append_card
-
-la $a0, card_list
-lw $a1, card_num
-jal append_card
+jal print_card_in_card_list
 
 
 # Write code to check the correctness of your code!

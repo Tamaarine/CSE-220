@@ -502,34 +502,6 @@ deal_starting_cards:
     # If we are here then we have finished adding the 9 faceup cards
     # And we are essentially done with the algorithm, deal_starting_cards
     # don't return anything hence we can just start restoring and deallocating the memories
-
-    # I must write a method to check the cards that is in each list
-    lw $a0, 0($s0) # Column =0
-    jal print_card_in_card_list
-    
-    lw $a0, 4($s0) # Column 1
-    jal print_card_in_card_list
-    
-    lw $a0, 8($s0) # Column 2
-    jal print_card_in_card_list
-    
-    lw $a0, 12($s0) # Column 3
-    jal print_card_in_card_list
-    
-    lw $a0, 16($s0) # Column 4
-    jal print_card_in_card_list
-    
-    lw $a0, 20($s0) # Column 5
-    jal print_card_in_card_list
-    
-    lw $a0, 24($s0) # Column 6
-    jal print_card_in_card_list
-    
-    lw $a0, 28($s0) # Column 7
-    jal print_card_in_card_list
-    
-    lw $a0, 32($s0) # Column 8
-    jal print_card_in_card_list
     
     # Let's also print the size of the deck as well to check how many cards
     # we have left
@@ -578,16 +550,15 @@ print_card_in_card_list:
     	# Let's just get our stopping condition out of the way which is when
     	# our counter is greater than or equal to the size of card_list in $t1
         bge $t2, $t1, finished_printing_each_card_in_card_list
-    
-        # Now we are here then that means we have to actually print the
-        # card value that is inside the currNode pointer
-        # Let's get the card value and put it into $t3
-        lw $t3, 0($t0)
         
-        # We print it
-        move $a0, $t3
-        li $v0, 34
+        # Then we print it
+        addi $sp, $sp, -4
+        lw $a0, 0($t0)
+        sw $a0, 0($sp)
+        move $a0, $sp
+        li $v0, 4
         syscall
+        addi $sp, $sp, 4
         
         # Then we need a space after it as well
         li $a0, ' '
@@ -620,6 +591,106 @@ print_card_in_card_list:
     jr $ra
 
 get_card:
+    # This function basically get the card that is located at the given index
+    # keep in mind that the list is 0-indexed
+    
+    # $a0 -> The valid card_list of cards to search through
+    # $a1 -> The index that we want to retrive the card from
+    # Output -> $v0, 1 if the card we get is face down, 2 if the card we get is faceup
+    # and -1 if the index that was given is invalid or the list is empty
+    # Output -> $v1, returns the actual card value from the CardNode, -1 if the index is invalid
+    # or if the list is empty
+    
+    # First thing first we must check if the list we are searching through is empty
+    # which we can do by just checking the size of the card_list
+    # Let's get the size of the card_list into $t0
+    lw $t0, 0($a0)
+    
+    # Now if the size is 0 then we will return (-1,-1)
+    beq $t0, $0, get_card_card_list_empty_or_invalid_index
+    
+    # However, if we are here then that means the card_list is not empty
+    # hence we have to check whether or not the given index is valid
+    # a valid index is between 0 <= x < size so he have to check the logically opposite
+    # if the index is less than 0 it is invalid, if it is greater than or equal to size it is invalid
+    blt $a1, $0, get_card_card_list_empty_or_invalid_index
+    
+    # If we are here then that means the index is greater than or equal to 0 but
+    # we still have to check if it is greater than or equal to the size which is invalid
+    # we have our size in $t0 already so we can use that to help us checkl
+    # The index is greater than or equal to the size hence invalid
+    bge $a1, $t0, get_card_card_list_empty_or_invalid_index
+    
+    # Andd finally if we are here we can finally begin finding the index CardNode in our card_list
+    # we will be keeping a counter in $t1 which start with 0
+    li $t1, 0
+    
+    # We will be keeping our currNode pointer in $t2 as well and update as we go
+    lw $t2, 4($a0)
+    
+    # Our stopping condition we already got it which is just the index we are looking for
+    # then we can begin our for loop to search for that particular index
+    for_loop_to_look_for_index_card:
+        # Let's just get our stopping condition out of the way
+        # which is whenever our counter is greater than or equal to our target index
+        bge $t1, $a1, finished_looking_for_index_card
+    
+        # If we are here then that means we haven't reach the index node we want yet
+        # hence we have to increment the pointer as well as our counter
+        # Incrementing our counter
+        addi $t1, $t1, 1
+        
+        # Then we also have to incremento our currNode pointer to the next CardNode
+        # We will get the next and put it into $t3
+        lw $t3, 4($t2)
+        
+        # Then we put the next as our currNode pointer
+        move $t2, $t3
+        
+        # Then we can just jump back up the loop
+        j for_loop_to_look_for_index_card
+
+    finished_looking_for_index_card:
+    # If we are here then our currNode pointer will be pointing at the desired index CardNode that we want 
+    # Let's just get the card value and put that as our output value in $v1
+    lw $v1, 0($t2) # Putting the card value of CardNode as our $v1 output
+    
+    # Then we have to get the third byte of the card value in order to determine which output we
+    # give for $v0. We load the third byte of the card value into $t0
+    lbu $t0, 2($t2)
+    
+    # Now we can do our if-statement checking
+    li $t7, 'u' # 'u' for comparsion with the third byte
+    
+    # If we take this branch that means the third byte of the target card is a 'u'
+    # so we have to give the value 2 as the return value in $v0
+    beq $t0, $t7, get_card_is_a_faceup_card
+    
+    # However if we are here then that means the card must be facedown
+    # hence we just have to return 1 in $v0
+    li $v0, 1
+    
+    # Then we can just jump to finished algorithm
+    j finished_get_card_algorithm
+    
+    get_card_is_a_faceup_card:
+    # The target card is a face up card hence we have to return 2 in $v0
+    li $v0, 2
+    
+    # Then we can just jump to algorithm
+    j finished_get_card_algorithm
+    
+    
+    get_card_card_list_empty_or_invalid_index:
+    # If we are here then that means the card_list we are indexing through is empty
+    # or it could be that the index is less than 0 or greater than or equal to the size which is invalid as well
+    # hence we just return (-1,-1) as our output value
+    li $v0, -1
+    li $v1, -1
+
+    # Then we can just follow logically to return to the caller
+    finished_get_card_algorithm:
+    # Since we didn't use any $s register or allocate any memory we can just return to the caller no problem
     jr $ra
 
 check_move:
