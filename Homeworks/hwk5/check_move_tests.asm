@@ -578,7 +578,7 @@ node688577:
 .word 6574897
 .word node365927
 node796802:
-.word 7689014
+.word 7689015
 .word node255386
 node255386:
 .word 7689013
@@ -1003,7 +1003,7 @@ node578498:
 .word node759406
 
 
-# Legal move of several cards to a non-empty column
+# Legal move of several cards to a non-empty column case 4
 .data
 .align 2
 move: .word 197382
@@ -1304,7 +1304,7 @@ node172449:
 .word 0
 
 
-# Invalid move encoded
+# Invalid move encoded case 5
 .data
 .align 2
 move: .word 100860162
@@ -1497,8 +1497,8 @@ node801411:
 .word node118446
 
 
-# Attempted deal-move with an empty deck
-.data
+# Attempted deal-move with an empty deck case 6
+.data 
 .align 2
 move: .word 16777216
 ##### Deck #####
@@ -1690,8 +1690,8 @@ node688577:
 .word node365927
 
 
-# Invalid column number
-.data
+# Invalid column number case 7
+.data 
 .align 2
 move: .word 1115137
 ##### Deck #####
@@ -2123,7 +2123,7 @@ node203138:
 .word node575879
 
 
-# Invalid row number
+# Invalid row number case 8
 .data
 .align 2
 move: .word 263937

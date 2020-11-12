@@ -589,6 +589,95 @@ print_card_in_card_list:
     # that is in the card_list already so we can just return to the caller without
     # any restoring or deallocation of memory at all
     jr $ra
+    
+print_board:
+    # This functions takes in an array of 9 pointers and print each of the card_list
+    # that is in each pointer by calling print_card_in_card_list
+    
+    # $a0 -> The address of the board array which contains 9 pointers to 9 card_list structs
+    
+    # We will be calling functions so we need to save $a0 and as well as our return address
+    # 8 bytes so far but we probably need 2 more as our counter and stopping condition
+    # so total of 16 bytes
+    addi $sp, $sp, -16 # Allocating 16 bytes of memory on the stack
+    
+    # Saving the $s registers before wecan use them
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register 
+    sw $s2, 8($sp) # Saving the $s2 reigster
+    
+    # We also have to save the return address else print_board won't know where to return
+    sw $ra, 12($sp)
+    
+    # Now we can move the arguments onto the $s register
+    move $s0, $a0 # $s0 will be the address that points to the array of 9 pointers
+    
+    # We will need a counter in $s1
+    li $s1, 0
+    
+    # We will also need a stopping condition which is just 9
+    li $s2, 9
+    
+    # Now we can begin our for loop to loop through the array of addresses
+    for_loop_to_print_each_card_list:
+        # Let's just get our stopping condition out of the way first
+        # which is whenever our counter is greater than or equal to 9
+        bge $s1, $s2, finished_printing_each_card_list
+    
+        # If we are in here then we haven't finished printing every single column yet
+        # so we can have to actually print it
+        # Let's calculate the effective address so we can get the pointer to the card_list we are printing
+        # through this formula base_address + i * 4
+        li $t7, 4 # 4 for mulitplication
+        
+        # Then we multiply the index with 4 and store that into $t0
+        mul $t0, $s1, $t7
+        
+        # Then we add the offset to the base_address into $a0
+        add $a0, $s0, $t0
+        
+        # Then we have to load the actual address that is stored at the effective address into $t1
+        lw $t1, 0($a0)
+        
+        # Print the column index first
+        move $a0, $s1
+        li $v0, 1
+        syscall 
+        
+        li $a0, 58
+        li $v0, 11
+        syscall
+        
+        li $a0, ' '
+        li $v0, 11
+        syscall
+        
+        # Then we can just call the print method to print that card list
+        move $a0, $t1
+        jal print_card_in_card_list
+        
+        # Then after priting we move onto the next column to print
+        # by incrementing the counter
+        addi $s1, $s1, 1
+        
+        # And jump back up the loop
+        j for_loop_to_print_each_card_list
+    
+    finished_printing_each_card_list:
+    # If we are here then we that means we have finished printing all the 
+    # 9 linked list hence we can start restoring the $s registers we have used
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 reigster
+    lw $s2, 8($sp) # Restoring the $s2 register
+    
+    # We also have to restore the return address or else it won't know where to return to
+    lw $ra, 12($sp)
+
+    # Then we have to deallocate the memory we have used
+    addi $sp, $sp, 16 # Deallocating the 16 bytes of memory we have used
+    
+    # And finally we can return to the caller
+    jr $ra
 
 get_card:
     # This function basically get the card that is located at the given index
@@ -694,6 +783,561 @@ get_card:
     jr $ra
 
 check_move:
+    # This function just look at the game move that is encoded in the integer and check
+    # if it is a legal or illegal move by returning an integer code that tells the result
+    # it will make no changes to the board but just tell whether or not the move is valid
+    
+    # $a0 -> Array of 9 pointers where each pointer points to a card_list struct address
+    # $a1 -> The pointer to a valid card_list that represents a deck of cards
+    # $a2 -> The integer that encodes the game move
+    # Output -> $v0, Returns in $v0 the integer that tells whether or not the move is legal or illegal
+    
+    # Since we will be calling functions we have to save our arguments and the return address
+    # 3 arguments, 12 bytes, and a return address 4 more bytes. So total of 16 bytes right now
+    # Add 16 more bytes for 4 more $s registers
+    addi $sp, $sp, -32 # Allocating 32 bytes of memory on the run time stack
+    
+    # Then we have to save the $s registers before we can use them
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    # Now instead of saving another $s register, since we have to access the individual byte of move
+    # we are going to put the integer move directly onto the stack instead on a $s register at 8($sp)
+    sw $s2, 12($sp) # Saving the $s2 register
+    sw $s3, 16($sp) # Saving the $s3 register
+    sw $s4, 20($sp) # Saving the $s4 register
+    sw $s5, 24($sp) # Saving the $s5 register
+    
+    # Then we have to also save the return address or else it won't know where to return to
+    sw $ra, 28($sp)
+    
+    # Now we can move the arguments onto the $s registers
+    move $s0, $a0 # $s0 will have the board that contains an array of 9 pointers where each pointer points to a column
+    move $s1, $a1 # $s1 is the pointer that points to a deck of cards
+    sw $a2, 8($sp) # Putting the move integer onto the stack, then 8($sp) can access first byte, 9($sp) second byte and so on
+    
+    # Now after we have everything saved we can begin our error checking
+    # First error, deal_move parameter error
+    # It will return -1 if the move argument encodes an invalid deal move so if byte #3 is 1 but all
+    # other bytes it not all zero return -1. Or if the deal_move byte is not 0 or 1 return -1
+    # Let's load in byte #3 into $t0 first
+    lbu $t0, 11($sp) # Loading in byte #3 of the move
+    
+    # We will have to split into two cases, one where byte #3 is 0, meaning normal move
+    # and the other case is 1, meaning deal move
+    beq $t0, $0, check_move_is_a_normal_move
+    
+    # However, if we are here then it is definitely not a normal_move and we have to check
+    # if it is a deal_move which is if the byte #3 is 1
+    li $t7, 1 # Load in 1 for comparsion
+    
+    # If byte #3 is a 1 then we have a deal move then we have to do more checking
+    # to make sure that all other bytes are 0, if not deal_move_parameter_error
+    beq $t0, $t7, check_move_is_a_deal_move
+    
+    # However, if we are here that means it is not a deal move, and is not a normal
+    # move. So it is some other number hence we have to return deal_move_parameter_error
+    # we can just jump there
+    j check_move_deal_move_parameter_error
+    
+    
+    check_move_is_a_deal_move:
+    # If we are here then that means the byte #3 is indeed 1 but we have to check all the other
+    # bytes to make sure they are all 0 or else deal_move_parameter_error
+    # We will load each byte into $t1, $t2, $t3 respective
+    lbu $t1, 8($sp) # Byte #0
+    lbu $t2, 9($sp) # Byte #1
+    lbu $t3, 10($sp) # Byte #2
+    
+    # Now bunch of bne statement to do the logical opposite of not equal to 0
+    # and jump to deal_move_parameter_error if it is true
+    bne $t1, $0, check_move_deal_move_parameter_error # Byte #0 is not 0
+    bne $t2, $0, check_move_deal_move_parameter_error # Byte #1 is not 0
+    bne $t3, $0, check_move_deal_move_parameter_error # Byte #2 is not 0
+    
+    # Anddd if we are here then that means the move encodes a deal move and
+    # all of the other bytes are all 0
+    # Then we move onto the second error which is illegal_deal_move_error
+    # which is when we have a valid deal move parameter but the deck is empty
+    # or if at least one column of the board is empty then we return -2
+    # Let's just check for the deck size first, if it is 0 then we can just return this error
+    # we load the size of the deck into $t0
+    lw $t0, 0($s1) # Loading the size of the deck
+    
+    # Now if the size of the deck is empty then we jump to illegal_deal_move_error
+    beq $t0, $0, check_move_illegal_deal_move_error
+    
+    # But if we didn't take the branch that means the deck is not empty, then we have to check
+    # if at least one of the column of the board is empty and we will be doing that through a for loop
+    # which loops through each column of the board, and see if any of the size is 0, if we find at least 1
+    # is 0 then we return the error
+    
+    # Now we need a counter to go through the 9 pointers in the board array
+    # and we will just set $t0 as our pointer starting with 0
+    li $t0, 0
+    
+    # Then we also need a stopping condition which is just 9 because we have 9 pointers
+    li $t1, 9
+    
+    # Now we can begin our for loop in search of a empty column
+    for_loop_to_find_empty_column:
+        # Let's just get our stopping condition out of the way which is when our counter
+        # is greater than or eqaul to 9 that means we have finished looking through
+        # all of the columns and none of them are empty
+        bge $t0, $t1, finished_loop_to_find_empty_column
+    
+        # Now if we are here we have to actually check the actual column we are at to see
+        # if it is empty or not, if it is empty then we return the error
+        # if it is not empty for this column then we will just go check the next columns
+        # We have to get the pointer to the actual card_list by doing some math
+        # the effective address of where the pointer is stored can be calculated using
+        # base_address + i * 4
+        li $t7, 4 # Load in 4 for multiplication
+        
+        # Then we have to multiply our current counter by 4 and put the result into $t2
+        mul $t2, $t0, $t7 # i * 4
+        
+        # Then in $t2 we have our offset to add to the base_address
+        # Let's store the effective address into $t3
+        add $t3, $s0, $t2
+        
+        # Now $t3 have the effective address of where the pointer is stored let's actually get the pointer
+        # and put it into $t3 again
+        lw $t3, 0($t3)
+        
+        # Okay so we have the address of the actual card_list column, let's get the size of the column
+        # and put it into $t4
+        lw $t4, 0($t3)
+        
+        # And if this current column we are looking at have the size of 0 then we return the error
+        beq $t4, $0, check_move_illegal_deal_move_error
+        
+        # However, if we are here then that means this current column isn't empty hence
+        # we can move on and check the next column by incrementing the counter
+        addi $t0, $t0, 1
+        
+        # Then we can jump back up the loop
+        j for_loop_to_find_empty_column
+    
+    finished_loop_to_find_empty_column:
+    # If we are here then that means we have got through all 9 columns and none of the are empty
+    # and which means it is a leagl deal_move hence we can just return 1 as our output value
+    li $v0, 1
+    
+    # And we can jump to finished algorithm for this case
+    j finished_check_move_algorithm
+    
+    
+    check_move_is_a_normal_move:
+    # So we will be here if byte #3 is a 0 meaning it is a normal move
+    # which have a whole separate error checking on its own
+    # third error, normal_move_parameter_error. And this error on its on
+    # have 3 cases by itself
+    
+    # The first case of the parameter error returns -3 if the column or
+    # recipient column in the move is invalid, so they are not between 0 <= x < 9
+    # Let's check the donor column first which is byte #0 at 8($sp)
+    # Let's load in donor column into $t0
+    lbu $t0, 8($sp)
+    
+    # So if byte #0 is less than 0 or greater than or equal to 9 it is invalid
+    li $t7, 9 # We load 9 for comparsion
+    
+    # So we will jump to normal_move_parameter_error -3 if donor column is less than 0
+    # since it is invalid
+    blt $t0, $0, check_move_normal_move_parameter_error_neg_3
+    
+    # So if we are here we have to also make sure it is less than 9
+    # so if it is greater than or equal to 9 it will be invalid as well with the same error
+    bge $t0, $t7, check_move_normal_move_parameter_error_neg_3
+    
+    # Okay if we are here then that means column is valid, we also need to check the recipient column
+    # which is byte #2 located at 10($sp) let's just load it in and put it into $t1
+    lbu $t1, 10($sp) # Getting the recipient column from the move
+    
+    # Then we do the same checking. If the recipient column is less than zero we also return -3
+    # as the error code
+    blt $t1, $0, check_move_normal_move_parameter_error_neg_3
+    
+    # And if it is also greater than or equal to 9 we also return -3 error code
+    bge $t1, $t7, check_move_normal_move_parameter_error_neg_3
+    
+    # Okay so if we are here then we are steer clear from error code -3
+    # we can proceed to check the second case of normal_move_parameter_error which returns -4
+    # Let's just get the byte #1 first which represents the row we are taking the card from from the column
+    # and put that into $t2
+    lbu $t2, 9($sp) # Getting the donor row from the move
+    
+    # So the donor row must be greater than or equal to 0, meaning it can't be less than 0
+    # we will do the check right here. If it is less than 0 error code -4
+    blt $t2, $0, check_move_normal_move_parameter_error_neg_4
+    
+    # Now we have to make sure this row index we are taking from the column is less than the column size
+    # so it cannot be greater than or equal to the card_list's size at i
+    # If we are here then that means the column we are taking from is in fact valid so we can use this
+    # index to calculate the effect address of where the pointer is stored in board[]
+    # base_address + i * 4
+    li $t7, 4 # Load 4 for multiplication
+    
+    # We do i * 4 and put the result into $t3
+    mul $t3, $t0, $t7
+    
+    # Now we have the offset we can just add it to the base_address to calculate the
+    # effective address of where that pointer is stored on the array, we will put the
+    # effective address back into $t3
+    add $t3, $s0, $t3
+    
+    # Now we load the pointer that is stored in that effective address into $t4
+    lw $t4, 0($t3)
+    
+    # Okay we load in the size into $t5 from the card_list struct
+    lw $t5, 0($t4)
+    
+    # Okay we got the size right now, our donor row must be less than this size
+    # else we return -4 as our error code
+    bge $t2, $t5, check_move_normal_move_parameter_error_neg_4
+    
+    # Finally, if we are here then that means we are steer clear from error code -4
+    # we have our final case to check which isn't too bad
+    # The last case will return -5 if the donor column and the recipient column are valid
+    # but they are equal, which represent a move from a column to itself which doesn't count
+    # and we have to return the error code approripately
+    # We have already got the donor column and recipient column from up there
+    # $t0 have our donor column, and $t1 have our recipient column we can just check their equality for error -5
+    beq $t0, $t1, check_move_normal_move_parameter_error_neg_5 # We branch to error -5 if donor column and recipient columns are the same   
+    
+    
+    # Last case of error checking which is illegal_normal_move_error
+    # and there is total of 3 subcases to handle as well!
+    # Let's just begin with the first one which is if the card at donor column and
+    # row is a face down card. We must call get_card on that column
+    # So again we have the donor column in $t0 already lets 
+    # that effective address on the board first 
+    # base_address  + i * 4
+    li $t7, 4 # 4 for mulipliation
+    
+    # We will do i * 4 and put the result into $t3
+    mul $t3, $t0, $t7
+    
+    # In $t3 right now we have the offset that we have to add to the base_address
+    # let's add it and store the effective address back into $t3
+    add $t3, $s0, $t3
+    
+    # We load the pointer into $t4 from the effective address
+    # this is the address we use to call get_card on
+    lw $t4, 0($t3)
+    
+    # We must call get_card here
+    # $a0 -> The card_list we are indexing through which is just $t4
+    # $a1 -> The index we are looking at which is just $t2, the donor row
+    move $a0, $t4 # The column of card_list we are indexing through
+    move $a1, $t2 # The card index we are looking at
+    
+    # Then we can call the function
+    jal get_card
+    
+    # In $v0 we have whether or not the card is facedown(1) or faceup(2)
+    # if the return value is 1 meaning the card we start to take from is facedown
+    # we return -6 error code
+    li $t7, 1 # Load 1 for comparsion
+    
+    # We take this branch if the return value is a facedown card
+    beq $v0, $t7, check_move_illegal_normal_move_error_neg_6
+    
+    # Okay if we are here then we are clear from -6 error code we can start checking for the second
+    # subcase of returning -7 which is there is a gap in between the cards we are taking.
+    # so if the cards we are picking are 6-5-3-2-1 it will return -7 because it jumped a card
+    # from 5 to 3. The way we will be doing this is traverse the given column starting at the
+    # row index down to the last card, looking at two cards at a time and if the any
+    # pair of two cards have differences of not being 1 we return -7
+    # First things first we need the pointer to the card_list struct of the column we are looking through
+    # Keep in mind the formula of i * 4
+    li $t7, 4 # Load 4 for mulitplication
+    
+    # i will be the donor column let's just get it again and put it into $t6
+    lbu $t6, 8($sp)
+    
+    # Let's do the multiplication and put the offset into $t3
+    mul $t3, $t6, $t7 # i * 4
+    
+    # Then we add it to the base_address to get the effective address of where the pointer is stored
+    # and put it back into $t3
+    add $t3, $t3, $s0
+    
+    # Then we can load the struct address into $s4 for us to use. This is the address of the card_list
+    # to the column
+    lw $s4, 0($t3)
+    
+    # In $s2 we will be storing the row index that we start to look exam at
+    # In $s3 we will store the last index we will be looking at which is the size of that column - 1,
+    # because we are looking at two cards at a time
+    lbu $s2, 9($sp) # $s2 will have the row that we start looking at the column with
+    
+    # We first load in the size of the column into $s3 first
+    lbu $s3, 0($s4)
+    
+    # Then we subtract 1 from it because we need to stop the for loop one early since we are looking
+    # at two cards at a time
+    addi $s3, $s3, -1
+    
+    # Now we can begin our for loop to exam for if the card/cards are going to be moved are not in
+    # descending order
+    for_loop_to_look_for_not_descending_order:
+        # First we will get our stopping condition out of the way which is
+        # when our row counter $s2 is greater than or equal to the size of the column - 1 $s3
+        # that means we have looked through every pair of cards and they are all in descending order
+        # thus no error is needed to be returned
+        bge $s2, $s3, finished_loop_to_look_for_not_descending_order
+    
+        # However if we are here then that means we didn't finished looking through
+        # every pair of the cards so we have to actually look at that pair
+        # Let's get the current card value at index i
+        # $a0 -> The card_list we are indexing through which is $s4
+        # $a1 -> The index we want to get the card from which is $s2
+        move $a0, $s4 # The card_list we are indexing through
+        move $a1, $s2 # The index we are searching through
+        
+        # Call the get_card method
+        jal get_card
+        
+        # In $v1 we have the card value that is returned let's save that into $s5 since we have to
+        # call get_card one more time to get the i + 1 card's value
+        move $s5, $v1
+        
+        # Then we have to get the i + 1 card'svalue
+        # $a0 -> The card_list we are indexing through which is $s4
+        # $a1 -> The index we want to get the card from which is $s2 + 1
+        move $a0, $s4 # The card_list we are indexing through
+        addi $a1, $s2, 1 # The index we are searhcing through which is $s2 + 1
+        
+        # Call the get_card method
+        jal get_card
+        
+        # Okay now in $s5 we have the current card's value
+        # and in $v1 we have the current card + 1's value 
+        # we must get the two card's rank value and compare them if the difference between
+        # the current one and the one after is not 1 return -7 error, else we check the next pair
+        # by incrementing the counter and going back up the loop again
+        
+        # We can get the current card's value along by doing sll 24 then srl 24
+        sll $s5, $s5, 24 # Move 24 bit left
+        srl $s5, $s5, 24 # Move 24 bit right
+        
+        sll $v1, $v1, 24 # Move 24 bit left
+        srl $v1, $v1, 24 # Move 24 bit right
+        
+        # Okay $s5 we have current card's value and $v1 is the next card's value
+        # We subtract these two cards if the value is not 1 then we branch
+        # We store the difference into $t0
+        sub $t0, $s5, $v1 # Current card - Next card
+        
+        # If the difference is not 1 then we branch to error -7
+        li $t7, 1 # Load 1 for comparsion
+        
+        # If the difference between the current card and the next card is not one then we return error code -7
+        bne $t0, $t7, check_move_illegal_normal_move_error_neg_7
+        
+        # However if we didn't take the branch then that means the two pair we have
+        # have descending value hence we go to the next pair and check
+        # we have to increment our counter before we can jump back up
+        addi $s2, $s2, 1
+        
+        # Then we can just jump back up the loop
+        j for_loop_to_look_for_not_descending_order
+    
+    finished_loop_to_look_for_not_descending_order:
+    # If we are here then that means we have to looked through every pair starting from the row index
+    # and all the pairs are in valid descending order hence error -7 is not needed to be returned
+    # Now we check the last subcase which is -8. So if the recipient column is not empty
+    # AND the selected card is not one less than the rank of the top card in the recipient column
+    # we just return error -8
+    # Let's get the card that is on top of the recipient column
+    # To do that we will need the recipient column at 10($sp) from the stack
+    # Let's get that and put it into $t0
+    lbu $t0, 10($sp) # Recipient column index
+    
+    # Keep in mind the formula is base_address + i * 4
+    li $t7, 4 # Load in 4 for multiplication
+    
+    # Then we do i * 4 and store the result into $t1
+    mul $t1, $t0, $t7
+    
+    # Then we add the base_address with the offset to get the effective address so we store it into $t0
+    add $t0, $s0, $t1
+    
+    # Then we load the pointer into $t0
+    lw $t0, 0($t0)
+    
+    # Before we can get the top card of recipient column we must check if it is empty or not empty first
+    # We can load the size of recipient column card_list into $t1
+    lw $t1, 0($t0)
+    
+    # Now if the size is equal to 0 we branch away to just return 2 as a success because there is no
+    # difference to check to move a card or stack of card into an empty column
+    beq $t1, $0, empty_recipient_column_success_code_2
+    
+    # However, if we are here then that means the recipient column is not empty hence we have to
+    # check the difference between the two cards
+
+    # We are comparing the top of the recipient which is the last card in the card_list, hence size - 1
+    # We subtract 1 to get us the index of the last card
+    addi $t1, $t1, -1
+    
+    # Then we have to call get_card to actually get the card to make the comparsion
+    # $a0 -> The card_list we are looking through which is the recipient column, $t0
+    # $a1 -> The index we are looking at which is $t1
+    move $a0, $t0 # The recipient column
+    move $a1, $t1 # The last card or top of the card
+        
+    # Call the get_card method
+    jal get_card
+    
+    # Okay in $v1 we have the recipient column's top card value let's store that into $s5
+    move $s5, $v1
+    
+    # Now we have to get the donor column row card
+    # $a0 -> The card_list we are looking through, we have the donor column's card_list address stored that into $s4 already
+    # $a1 -> The index we are looking at which is just 9($sp)
+    move $a0, $s4 # The card_list we are looking through which is the donor column
+    lbu $a1, 9($sp) # The index we are looking at
+    
+    # Then we call the get_card function
+    jal get_card
+    
+    # Now we have to do the same shifting function we did for error code -7
+    # move 24 bit to the left and move 24 bit back
+    sll $s5, $s5, 24 # Move 24 bit left
+    srl $s5, $s5, 24 # Move 24 bit right
+    
+    sll $v1, $v1, 24 # Move 24 bit left
+    srl $v1, $v1, 24 # Move 24 bit right
+    
+    # Finally $s5 is the top card value of recipient column, which $v1 is the card we taking from from the donor column
+    # $s5 - $v1 must equal to 1 to consider a valid move
+    # We store the difference into $t0 again
+    sub $t0, $s5, $v1
+    
+    # Load in 1 for comparsion
+    li $t7, 1
+    
+    # If we have the difference of 1
+    beq $t0, $t7, non_empty_recipient_column_success_code_3
+    
+    # However if we are here then that means the difference is not 1
+    # hence we return the error code of -8
+    j check_move_illegal_normal_move_error_neg_8
+    
+  
+  
+    check_move_normal_move_parameter_error_neg_3:
+    # If we are here then we return -3 because either the donor column or recipient column in the move
+    # are invalid
+    li $v0, -3
+    
+    # And we can jump to finish algorithm
+    j finished_check_move_algorithm
+    
+    
+    check_move_normal_move_parameter_error_neg_4:
+    # If we are here then we have to return -4 because the row we want to move from
+    # is invalid in move. Meaning the btye is not between 0 <= x < board[i].size
+    # So we just have to return -4
+    li $v0, -4
+    
+    # And jump to finish the algorithm
+    j finished_check_move_algorithm
+    
+    
+    check_move_normal_move_parameter_error_neg_5:
+    # If we are here then we return -5 because the donor column and recipient columns
+    # are valid but they are the same number. Moving from a column to itself don't count
+    li $v0, -5
+    
+    # And we jump to finish the algorithm
+    j finished_check_move_algorithm
+    
+    
+    check_move_illegal_normal_move_error_neg_6:
+    # If we are here then we return -6 because the card at donor column and row is a face
+    # down card and we are trying to move from that card which we aren't allow to since
+    # we can't move a facedown card
+    li $v0, -6
+    
+    # And we jump to finish the algorithm
+    j finished_check_move_algorithm
+    
+    
+    check_move_illegal_normal_move_error_neg_7:
+    # If we are here then we return -7 because the cards we are going to be moving are not in descending order
+    li $v0, -7
+    
+    # And we can jump to finish the algorithm
+    j finished_check_move_algorithm
+    
+    
+    check_move_illegal_normal_move_error_neg_8:
+    # If we are here then we return -8 because the recipient column is not empty
+    # AND the difference between the selected card and recipient card is not 1
+    li $v0, -8
+    
+    # And jump to finish
+    j finished_check_move_algorithm
+    
+    
+    empty_recipient_column_success_code_2:
+    # If we are here then that means the recipient column is empty
+    # and the cards we are moving are in descending order hence it is a valid legal move
+    # we just return 2
+    li $v0, 2
+    
+    # And jump to finish
+    j finished_check_move_algorithm
+    
+    
+    non_empty_recipient_column_success_code_3:
+    # If we are here then that means the recipient column is not empty
+    # but the difference between the top card and the cards we are moving is 1
+    # hence it is considered a valid legal move just return 3
+    li $v0, 3
+    
+    # And jump to finish
+    j finished_check_move_algorithm
+    
+    
+    check_move_illegal_deal_move_error:
+    # If we are here then that means we do have a valid deal move bytes
+    # but the deck is empty or if at least one column of the board is empty
+    # hence we just return -2
+    li $v0, -2
+    
+    # Then after setting the output we can just jump to finished algorithm
+    j finished_check_move_algorithm
+    
+    
+    check_move_deal_move_parameter_error:
+    # If we are here then that means either byte #3 is not 0 or 1, or
+    # if byte #3 is a 1 but all other bytes is not all 0 hence we return -1
+    li $v0, -1
+    
+    
+    finished_check_move_algorithm:
+    # If we are here then that means we have finished checking whether or not the
+    # given move is valid or not. We can start restoring the $s registers we have used
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    # We don't haev to restore 8($sp) to anything because it just stores the move integer on the stack
+    # we didn't use any more $s registers just 2 and that's it
+    lw $s2, 12($sp) # Restoring the $s2 register
+    lw $s3, 16($sp) # Restoring the $s3 register
+    lw $s4, 20($sp) # Restoring the $s4 register
+    lw $s5, 24($sp) # Restoring the $s5 register
+    
+    # Then we have to also restore the return address or else it won't know where to return to
+    lw $ra, 28($sp)
+    
+    # Then we have to deallocate the memory we have used
+    addi $sp, $sp, 32 # Deallocating the 32 bytes of memory we have used
+    
+    # And we are done and can just jump back to the caller
     jr $ra
 
 clear_full_straight:
