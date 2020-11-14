@@ -189,11 +189,34 @@ node125375:
 .text
 .globl main
 main:
+li $s0, 699
+li $s1, 699
+li $s2, 699
+li $s3, 699
+li $s4, 699
+li $s5, 699
+li $s6, 699
+li $s7, 699
+
+la $a0, board
+jal print_board
+
 la $a0, board
 lw $a1, col_num
 jal clear_full_straight
 
 # Write code to check the correctness of your code!
+move $a0, $v0
+li $v0, 1
+syscall
+
+li $a0, '\n'
+li $v0, 11
+syscall
+
+la $a0, board
+jal print_board
+
 li $v0, 10
 syscall
 

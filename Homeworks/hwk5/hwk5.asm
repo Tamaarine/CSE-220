@@ -1341,6 +1341,370 @@ check_move:
     jr $ra
 
 clear_full_straight:
+    # This function just basically try to remove tyhe top 10 cards at the given column if the
+    # top 10 cards are face up and are from 9 to 0, or 0 to 9 depend on the way you look at it
+    # After you remove the full straight, the top card of the column is flipped face up, so the
+    # size of the column need to be adjusted as well
+    
+    # $a0 -> The address that contains the array of 9 pointers which each represent a column
+    # $a1 -> The 0-indexed number that represent the column to check for a full straight
+    # Output -> $v0, Returns a code that communicate the correct result to the caller
+    
+    # Since we have to the function get_card that means we have to save our arguments
+    # into the $s register so we have to allocate memory on the run time stack
+    # 2 arguments 8 bytes, 1 return address 4 more bytes. So total of 12 bytes for now
+    # 16 more byte for 4 more reigster
+    addi $sp, $sp, -28 # Allocating 28 bytes of memory on the run time stack
+    
+    # Now we can save the $s registers before we can use them
+    sw $s0, 0($sp) # Saving the $s0 register 
+    sw $s1, 4($sp) # Saving the $s1 register
+    sw $s2, 8($sp) # Saving the $s2 register
+    sw $s3, 12($sp) # Saving the $s3 register
+    sw $s4, 16($sp) # Saving the $s4 register
+    sw $s5, 20($sp) # Saving the $s5 register
+    
+    # We also have to save the return address else clear_full_straight won't know where to return
+    sw $ra, 24($sp)
+    
+    # Then we can move the arguments to the $s registers
+    move $s0, $a0 # $s0 will represent the array that contains the 9 array pointers to card_list
+    move $s1, $a1 # $s1 will have the index number that represent the column to check for a full straight
+    
+    # We will do the checks for full straight step by step
+    # the first step is to make sure the column argument that is given is in valid range, which is 0 <= x < 9
+    # If the given column index is less than 0 then it is definitely not a valid column index
+    # hence we return -1 as our output value
+    blt $s1, $0, clear_full_straight_invalid_neg_1
+    
+    # If we are here then that means the column index is definitely 0 or greater but we have
+    # to make sure it is less than 9 else it is definitely invalid
+    li $t7, 9 # Load 9 for comparsion
+    
+    # If the given column index is greater than or equal to 9 then it is definitely not a valid column index
+    # hence we have to return error code -1
+    bge $s1, $t7, clear_full_straight_invalid_neg_1
+    
+    
+    # If we are here then that means we are steer clear from error code -1
+    # hence we begin to check for error code -2 which is thrown if
+    # the card_list's size is less than 10. If it is greater than or equal to 10 then we don't throw -2
+    # First we have to calculate the offset to get the effective address which stores the
+    # pointer to the card_list struct
+    # This can be computed by doing base_address + i * 4
+    li $t7, 4 # Load 4 for multiplication
+    
+    # Then we have to multiple 4 with the index $s1 let's store the offset into $t0
+    mul $t0, $s1, $t7 # i * 4
+    
+    # Then we add it to the base_address and put the result into $t1
+    add $t1, $t0, $s0
+    
+    # Now in $t1 we have the effective address of the column's pointer we put it into $s2 so
+    # we can use it across the other section of error checking
+    lw $s2, 0($t1)
+    
+    # Now let's just load in the size of the card_list first into $t0
+    lw $t0, 0($s2)
+    
+    # Then we have to compare to 10, if it is 10 or less then we will return error code -2
+    # because the card_list doesn't even have 10 cards inside so it cannot be a full straight 100%
+    li $t7, 10 # Load 10 for comparsion
+    
+    # We will take the branch to return error code -2 if the size of the column we are checking
+    # at is less than 10. If it is greater than or equal to 10 we will have to do further checking
+    blt $t0, $t7, clear_full_straight_invalid_neg_2
+    
+    
+    # Okay great if we are here then we are steer clear from error code -3
+    # and now we have to actually check for the full straight. This is how we will be doing it
+    # We will have a index counter that starts at the top of the card so size - 1
+    # and the stopping condition will be size - 1 - 9 = size - 10 and is ble size - 10
+    # because we want it to check in pairs for a full straight
+    # Let's review the variables first before we dive in
+    # $s2 -> Is the address of our column card_list struct
+    # $s0 -> Is our board is array
+    # $s1 -> Is the column we are searching full straight through
+    # $s3 -> We will use this as our counter that starts from size - 1 of the board
+    # $s4 -> This will be used as our stopping condition of the for loop which is equal to size - 10
+    
+    # Let's just get our counter first which is size - 1, we will get the size of the card_list into $t0
+    lw $t0, 0($s2) # Getting the size of the card_list
+    
+    li $t7, 1 # Load in 1 for subtraction
+    
+    # size - 1 to get our starting index which is at the last card
+    sub $s3, $t0, $t7
+    
+    # Then we have to subtract size - 10 to get the stopping condition at the 10th card
+    li $t7, 10 # Load 10 for subtraction
+    
+    # size - 10 to get our stopping condition in $s4
+    sub $s4, $t0, $t7 
+    
+    # Now we get the last card from the card_list first to see if it is 0
+    # if it is not 0 then we just return -3 it is not valid full straight to clear from
+    # $a0 -> The card_list we are indexing through
+    # $a1 -> The index we want to look at in the card_list we are just looking at the last card first which is $s3
+    move $a0, $s2
+    move $a1, $s3
+    
+    # Then we can call the method to get us the last card
+    jal get_card
+    
+    # Okay in $v1 we have the card value and in $v0 we have whether or not the card
+    # is face up or face down. In order to continue this check for full straight
+    # this last card must be face up (2) AND have value of 0 (sll 24 + srl 24)
+    # Let's check the face up constraint first
+    li $t7, 1 # Load 1 for comparsion
+    
+    # We will take this branch if the last card we get is a face down card hence
+    # it cannot never be a full straight that we clear since it is a face down card
+    beq $v0, $t7, clear_full_straight_invalid_neg_3
+    
+    # However if we are here then that means the last card is a face up card, then we have to
+    # do another check that the last card is also have the value of 0, else return -3
+    # We can get the value of the last card by doing sll 24 and srl 24 on $v1
+    sll $v1, $v1, 24 # Shift left 24 bits
+    srl $v1, $v1, 24 # Shift right 24 bits
+    
+    # Then in $v1 we have the rank of the last_card and we just compare it to $0
+    # if it is not '0' then we return -3, if it is '0' then we will continue our check
+    li $t7, '0' # Load '0' for comparsion
+    
+    bne $v1, $t7, clear_full_straight_invalid_neg_3
+    
+    # Now if we are here then that means the last card of this column we are checking
+    # infact does have 0 as our top card and is face up. Now we have to check every pair
+    # from size - 1 index to and not including size - 10 index to check for a valid
+    # full straight
+    # Keep in mind that $s3 is our starting index at the last card
+    # and $s4 is our stopping index at index - 10
+    # $s5 we will use it to store the prev or current card value
+    for_loop_to_check_for_full_straight:
+        # Let's just get our stopping condition out of the way
+        # which is whenever our counter is less than or equal to our stopping condition
+        ble $s3, $s4, finished_for_loop_to_check_for_full_straight 
+    
+        # However, if we are here then that means we haven't finished checking every
+        # pair yet so we have to actually check it
+        # Let's get the current card and check for the face up and face down constraint
+        # and then we will check the previous card relative to the current card for face up and face down constraint too
+        # and then if both card pass the faceup constraint we will check their differences
+        
+        # Getting current card by calling get_card
+        # $a0 -> The card_list we are indexing through
+        # $a1 -> The index we are looking at in the card_list
+        move $a0, $s2 # The card_list we are seraching through
+        move $a1, $s3 # The current card index we are getting 
+        
+        # Then we can call the function get_card
+        jal get_card
+        
+        # Okay so in $v0 we have whether or not the current card is face up or down
+        # and in $v1 we have the card value we will have to do check on both of them
+        li $t7, 1 # Load 1 for comparsion
+        
+        # If the current card is a facedown card it cannot have a full straight hence just
+        # return -3 as our output
+        beq $v0, $t7, clear_full_straight_invalid_neg_3
+        
+        # However if we are here then that means it is faceup, we will sdave the card value into
+        # s5, so we can move onto getting the card value of the previous card
+        move $s5, $v1 # Saving the current card's value into $s5
+        
+        # Okay we have the get the previous card by calling get_card
+        # $a0 -> The card_list we are indexing through
+        # $a1 -> The idnex we are looking at in the card_list which is one less than the current card's index
+        move $a0, $s2 # The card_list we are searching through
+        addi $a1, $s3, -1 # We have to subtract one from the current index in order to get the index of the previous card
+        
+        # Then we can call the function get_card
+        jal get_card
+        
+        # Alright again we have to also check the face up and face down constraint on the preivous card
+        # as well just like the current card
+        li $t7, 1 # Load 1 for comparsion
+        
+        # If the previous card is also a facedown card it cannot have a full straight in the
+        # column hence we just retunr -3 as our output
+        beq $v0, $t7, clear_full_straight_invalid_neg_3
+        
+        # But if we are here then that means both the current card and the previous card
+        # are face up hence we can proceed to check theri differences 
+        # But first we have to do the shifts to get their rank value by moving 
+        # 24 bit left and 24 bit right
+        sll $s5, $s5, 24 # Shift 24 bit left
+        srl $s5, $s5, 24 # Shift 24 bit right
+        
+        sll $v1, $v1, 24 # Shift 24 bit left
+        srl $v1, $v1, 24 # Shift 24 bit right
+        
+        # In $s5 is the current card's value and $v1 is the previous card's value
+        # previous card - current card must be equal to 1 else we return -3 as our
+        # output value. We will store the differences into $t0
+        sub $t0, $v1, $s5 # previous card - current card
+        
+        li $t7, 1 # Load 1 for comparsion
+        
+        # If the difference between the two card is not 1 then uh oh it is not
+        # a valid full straight because there is at least one pair of cards
+        # that are not consecutive hence we return -3 as our output value
+        bne $t0, $t7, clear_full_straight_invalid_neg_3
+        
+        # But if we are here then that means the current card and previous card's difference
+        # is indeed 1. Then we have to go on and check the other pairs by doing another iteration
+        # we have to decrement our counters
+        addi $s3, $s3, -1 
+        
+        # Then we can jump back up the loop
+        j for_loop_to_check_for_full_straight    
+    
+    finished_for_loop_to_check_for_full_straight:
+    # Now if we are here then that means we have finished checking all the 10 cards and
+    # they are a valid full straight starting at the top
+    # Few things we have to do. We have to remove the 10 full straight cards by cutting off
+    # the connection. We will do that after we check the sizes
+    # If the size - 10 is equal to 0 we just make that column's head equal to 0 removing all the carsd
+    # If the size - 10 is 1 or more we find the last card after removing the 10 full straight card
+    # and make that next equal to 0
+    
+    # Let's get the current size again in $t0 of the column we are checking
+    lw $t0, 0($s2) 
+    
+    # We will subtract 10 from it
+    addi $t0, $t0, -10
+    
+    # Now if the size after taking off 10 cards is 0 meaning empty column we will return 2
+    # and cut off the head to just be 0
+    beq $t0, $0, clear_full_straight_is_empty
+    
+    # However if we are here then the column is not empty after taking off the 10 cards
+    # we will jump to a label that will do the other things
+    j clear_full_straight_is_not_empty
+    
+    
+    clear_full_straight_is_empty:
+    # If we are here then that means the full straight is the only 10 cards that is
+    # in this column hence we update the size of this card_list and just make
+    # head be equal to 0 
+    
+    # We first update the size which is already calculated in $t0 
+    sw $t0, 0($s2) 
+    
+    # Then we just have to make $s2's head equal to 0 and we are done
+    sw $0, 4($s2) # Cutting off the connection to all the other cards
+    
+    # Then we return the output value of 2 and done
+    li $v0, 2
+    
+    # And we can just jump to finish the algorihtm
+    j finished_clear_full_straight_algorithm
+    
+    
+    clear_full_straight_is_not_empty:
+    # If we are here then that means is after the 10 cards are removed the column will still have
+    # few cards remaining we have to look at the cards that is left and flip the one that is on top
+    # That important card we are flipping and putting next to 0 is located at size - 11
+    # we can just take $t0 and subtract 1 to get that important card's index, and let's put that index
+    # into $t1
+    addi $t1, $t0, -1 # Subtracting 1 from size - 10 
+    
+    # We will need a for loop to traverse to that specific important CardNode
+    # we will start with the head let's get that and put it into $t3. This will be our currNode pointer
+    lw $t3, 4($s2)
+    
+    # Our counter will start with 0 in $t2
+    li $t2, 0
+    
+    # Now we can begin our for loop to search for that important CardNode which is located at $t1 index
+    for_loop_to_look_for_that_important_card:
+        # Let's just get our stopping condition out of the way which is
+        # whenever our counter is greater than or equal to the stopping condition
+        bge $t2, $t1, finished_looking_for_that_important_card
+    
+        # However, if we are here then that means we haven't reach the address of that important card yet
+        # hence we have to actually update our currNode pointer as well as our counter
+        # Get the next of currNode pointer into $t4
+        lw $t4, 4($t3)
+        
+        # Then we update our currNode pointer with that next address
+        move $t3, $t4
+        
+        # Then we update our counter
+        addi $t2, $t2, 1
+        
+        # And jump back up the loop
+        j for_loop_to_look_for_that_important_card
+    
+    finished_looking_for_that_important_card:
+    # If we are here then that means $t3 current have the address of that important card
+    # We make that CardNode's next equal to 0
+    sw $0, 4($t3)
+    
+    # And we have to flip it so it faces up
+    li $t7, 'u' # Load 'u' ascii for us to store it at byte #2
+    sb $t7, 2($t3) # Flip the important card to face up after removing the full straight flush
+    
+    # Then lastly we have to update the size of the card_list after removing the 10 cards
+    # which is still in $t0 in the card_list struct
+    sw $t0, 0($s2)
+    
+    # AND finally we are done we can just return 1 as our output value
+    li $v0, 1
+    
+    # And jump to finish the algorithm
+    j finished_clear_full_straight_algorithm
+    
+    
+    clear_full_straight_invalid_neg_1:
+    # If we are here then that means the given column index is not valid
+    # hence we just return -1 as our output value
+    li $v0, -1
+    
+    # Then we can jump to finish algorithm
+    j finished_clear_full_straight_algorithm
+    
+    
+    clear_full_straight_invalid_neg_2:
+    # If we are here then that means the column we are checking for full straight
+    # doesn't even have 10 cards or more hence it can never have a full straight
+    # so we just return -2 as our output value
+    li $v0, -2
+    
+    # And we can jump to finish algorithm
+    j finished_clear_full_straight_algorithm 
+    
+    
+    clear_full_straight_invalid_neg_3:
+    # If we are here then that means the card_list we are checking for full straight in
+    # has at least 10 or more cards. BUT! A full straight cannot be clear from the 
+    # top 10 cards, since it doesn't have the full straight or some of the are face down
+    # or the full strtaight exist somewhere else it doesnt' end at the last card
+    # hence we just return -3
+    li $v0, -3 
+    
+    # Then it can just follow logically to finsh the algorithm    
+    
+    
+    finished_clear_full_straight_algorithm:
+    # If we are here then that means we have finished the algorithm
+    # and we can start restoring the $s registers we have used and deallocate the memories
+    lw $s0, 0($sp) # Restoring the $s0 register 
+    lw $s1, 4($sp) # Restoring the $s1 register
+    lw $s2, 8($sp) # Restoring the $s2 register
+    lw $s3, 12($sp) # Restoring the $s3 register
+    lw $s4, 16($sp) # Restoring the $s4 register
+    lw $s5, 20($sp) # Restoring the $s5 register
+    
+    # We also have to restore the return address else it won't know where to return to
+    lw $ra, 24($sp)
+    
+    # And we can deallocate the memory we have used
+    addi $sp, $sp, 28 # Deallocating the 28 bytes of memory we have used
+    
+    # And finally we can return to the caller
+    
     jr $ra
 
 deal_move:
