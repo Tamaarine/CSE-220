@@ -1704,13 +1704,139 @@ clear_full_straight:
     addi $sp, $sp, 28 # Deallocating the 28 bytes of memory we have used
     
     # And finally we can return to the caller
-    
     jr $ra
 
 deal_move:
+    # This function will do a deal-move drawing 0 cards from the deck and lay them
+    # face up at the top of each of 9 columns of the game board sequentially
+    
+    # $a0 > The array of 9 pointers to the 9 columns card_list struct
+    # $a1 -> The pointer to the card_list which represent the deck we are drawing the 9
+    # cards from
+    
+    # Since we will be calling functions we have to save our arugments on the $s registers
+    # 2 arguments 8 bytes, 4 byte for the return address so 12 bytes in total
+    # 8 more byte for 2 more registers
+    addi $sp, $sp, -20 # Allocating 20 bytes of memory on the run time stack
+    
+    # We have to save the $s registers before we can use them
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 reigster
+    sw $s2, 8($sp) # Saving the $s2 register
+    sw $s3, 12($sp) # Saving the $s3 register
+    
+    # Saving the return address as well
+    sw $ra, 16($sp)
+    
+    # Now we can move the arguments onto the $s registers
+    move $s0, $a0 # $s0 will have the 9 pointers that pointers to the 9 columns of card_list struct
+    move $s1, $a1 # $s1 will have the pointer to the deck of cards we are distributing
+    
+    # And we can begin distributing the 9 cards from the deck
+    # We will do so through a for loop
+    # Our counter will be be $s2 which starts at 0
+    # Our stopping condition will just be 9 because we are dealing 9 cards and we have 9 columns
+    li $s2, 0 # Counter for the for loop
+    li $s3, 9 # Stopping condition for the for loop
+    
+    # Then we can start our for loop to deal 9 cards from the deck
+    for_loop_to_deal_9_cards:
+        # Let's just get our stopping condition out of the way first
+        # which is whenever our counter is greater than or eqaul to 9
+        # that means we have finished dealing 9 cards from the deck already
+        bge $s2, $s3, finished_loop_to_deal_9_cards
+
+        # If we are here then that means we haven't finished dealing the 9 cards
+        # yet so we have to actually deal them from the deck
+        # First thing first is to get the column that we are adding the card to
+        # Which can be done by doing base_address + i * 4, with i as $s2
+        li $t7, 4 # Load 4 for multiplication
+        
+        # Then we will do i * 4 and store the result into $t0
+        mul $t0, $s2, $t7
+        
+        # And we can add the offset with the base_address and store it into $t0 again
+        add $t0, $t0, $s0
+        
+        # We must load the actual word that is stored in that effective address
+        lw $t0, 0($t0)
+        
+        # Okay great we have the card_list struct of where we are adding the
+        # drawn card to which is in $t0
+        # Next step is to actually draw the top card from the deck
+        # Let's grab the head address from our card_list and put it into $t1
+        lw $t1, 4($s1)
+        
+        # Now before we can get the card value we must change the card to face up
+        # which have the ascii value of 'u' at byte #2
+        li $t7, 'u' # Load 'u' for storing the byte
+        
+        # Then we can store the byte at byte #t2 of the head address
+        sb $t7, 2($t1)
+        
+        # Then we can get the card value of the head card and put it again back into $t1
+        lw $t1, 0($t1)
+        
+        # Now we have what we have to append to this column and the column we are appending to
+        # $a0 -> The card_list struct we are adding the card to
+        # $a1 -> The card integer that we are adding it
+        move $a0, $t0 # The card_list we are adding the card value to
+        move $a1, $t1 # The card integer that we are adding
+        
+        # Then we can actually append the card into the card_list column
+        jal append_card
+        
+        # Okay great we added the card, the size of the column is handled already by append_card
+        # what we have to do now is to decrease the size of our deck and remove the
+        # card that we have just drawn out from the deck
+        # We will move the head of deck card_list to point at the next card
+        # We load in the head address first into $t0
+        lw $t0, 4($s1)
+        
+        # Then we get the next address of the first card into $t1
+        lw $t1, 4($t0)
+        
+        # And we can just store this address as the head of the deck card_list
+        sw $t1, 4($s1)
+        
+        # Then don't forget we have to decrement the size of the deck card_list as well
+        lw $t0, 0($s1) # Load in the current size of the deck
+        
+        # We subtract 1 from it
+        addi $t0, $t0, -1
+        
+        # Then store the word back into the size of the deck
+        sw $t0, 0($s1)
+        
+        # Next all we have to do is to increment the counter
+        addi $s2, $s2, 1
+        
+        # And jump back up the loop
+        j for_loop_to_deal_9_cards
+    
+    finished_loop_to_deal_9_cards:
+    # If we are here then that means we have finished dealing the 9 cards from the deck
+    # we can proceed to start restoring the $s registers and deallocate the memory
+    lw $s0, 0($sp) # Saving the $s0 register
+    lw $s1, 4($sp) # Saving the $s1 reigster
+    lw $s2, 8($sp) # Saving the $s2 register
+    lw $s3, 12($sp) # Saving the $s3 register
+    
+    # We have to also restore the return address else it won't know where to return it
+    lw $ra, 16($sp)
+    
+    # We can have to deallocate the memory we have used
+    addi $sp, $sp, 20 # Deallocating the 20 bytes of memory we have used
+    
+    # Then we can just jump back to the caller as we are done with this algorithm URGH
     jr $ra
 
 move_card:
+    
+    
+    
+    
+    
     jr $ra
 
 load_game:
