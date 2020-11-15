@@ -1,313 +1,363 @@
-# Move one card successfully
+# Deal-move and clear multiple full straights
 .data
 ##### Deck #####
 .align 2
 deck:
 .word 36  # list's size
-.word node460651 # address of list's head
-node727360:
-.word 6574899
-.word node831195
-node198980:
-.word 6574899
-.word node727360
-node935211:
-.word 6574900
-.word node101008
-node350317:
-.word 6574905
-.word node624722
-node272941:
-.word 6574898
-.word node198980
-node624722:
+.word node637399 # address of list's head
+node865399:
 .word 6574897
-.word node165860
-node190433:
+.word node755464
+node637399:
 .word 6574896
-.word node852662
-node376964:
+.word node326815
+node10365:
+.word 6574905
+.word node372287
+node742222:
 .word 6574901
-.word node272941
-node831195:
+.word node415112
+node32263:
 .word 6574900
-.word node269782
-node591214:
+.word node411517
+node990108:
+.word 6574896
+.word node950636
+node944205:
+.word 6574896
+.word node849777
+node411517:
+.word 6574900
+.word node278057
+node515703:
+.word 6574899
+.word node32263
+node402285:
+.word 6574898
+.word node621065
+node570775:
+.word 6574896
+.word node402285
+node806004:
+.word 6574901
+.word node124142
+node675171:
+.word 6574901
+.word node10365
+node983505:
+.word 6574904
+.word node546974
+node372287:
+.word 6574896
+.word node983505
+node591188:
 .word 6574902
-.word node85242
-node597489:
-.word 6574898
-.word node646107
-node916035:
-.word 6574898
-.word node12091
-node165860:
+.word node902341
+node278057:
+.word 6574902
+.word node668414
+node902341:
+.word 6574900
+.word node290328
+node621065:
+.word 6574903
+.word node45357
+node668414:
 .word 6574905
-.word node190433
-node942339:
-.word 6574899
-.word node591214
-node495685:
-.word 6574899
-.word node851930
-node460651:
-.word 6574905
-.word node337535
-node337535:
-.word 6574896
-.word node782946
-node661978:
-.word 6574905
-.word node564113
-node12091:
+.word node187689
+node187689:
+.word 6574901
+.word node509494
+node546974:
 .word 6574897
-.word node257497
-node257497:
-.word 6574896
-.word node942339
-node852662:
-.word 6574896
+.word node591188
+node849777:
+.word 6574905
+.word node675171
+node675212:
+.word 6574901
 .word 0
-node851930:
+node326815:
 .word 6574903
-.word node967704
-node269782:
-.word 6574899
-.word node597489
-node101008:
-.word 6574905
-.word node995880
-node564113:
-.word 6574901
-.word node816394
-node646107:
+.word node239383
+node239383:
+.word 6574896
+.word node865399
+node290328:
 .word 6574904
-.word node495685
-node394153:
+.word node806004
+node509494:
 .word 6574902
-.word node376964
-node995880:
-.word 6574896
-.word node916035
-node782946:
-.word 6574898
-.word node430808
-node967704:
-.word 6574897
-.word node913121
-node816394:
-.word 6574896
-.word node394153
-node758365:
+.word node742222
+node124142:
 .word 6574904
-.word node661978
-node913121:
-.word 6574897
-.word node703967
-node703967:
-.word 6574903
-.word node350317
-node85242:
+.word node515703
+node415112:
 .word 6574905
-.word node758365
-node430808:
-.word 6574901
-.word node935211
+.word node570775
+node640354:
+.word 6574905
+.word node675212
+node950636:
+.word 6574899
+.word node327089
+node327089:
+.word 6574899
+.word node640354
+node755464:
+.word 6574898
+.word node365701
+node365701:
+.word 6574897
+.word node944205
+node45357:
+.word 6574903
+.word node990108
 ##### Board #####
 .data
 .align 2
 board:
-.word card_list176680 card_list466763 card_list888166 card_list961566 card_list748778 card_list424833 card_list177744 card_list164350 card_list546800 
-# column #6
-.align 2
-card_list177744:
-.word 5  # list's size
-.word node673951 # address of list's head
-node673951:
-.word 6574902
-.word node452398
-node353181:
-.word 7689016
-.word 0
-node419135:
-.word 6574898
-.word node275454
-node275454:
-.word 6574902
-.word node353181
-node452398:
-.word 6574905
-.word node419135
-# column #3
-.align 2
-card_list961566:
-.word 5  # list's size
-.word node363125 # address of list's head
-node363125:
-.word 6574900
-.word node21272
-node21272:
-.word 6574902
-.word node693508
-node631835:
-.word 7689012
-.word 0
-node385664:
-.word 6574898
-.word node631835
-node693508:
-.word 6574901
-.word node385664
+.word card_list652504 card_list812016 card_list921683 card_list171864 card_list73675 card_list493365 card_list595505 card_list252786 card_list338789 
 # column #0
 .align 2
-card_list176680:
+card_list652504:
 .word 5  # list's size
-.word node580732 # address of list's head
-node580732:
-.word 6574904
-.word node452585
-node484647:
+.word node5197 # address of list's head
+node749158:
+.word 7689011
+.word node12927
+node12927:
+.word 7689010
+.word node564963
+node732414:
+.word 6574902
+.word node749158
+node5197:
+.word 6574905
+.word node732414
+node564963:
+.word 7689009
+.word 0
+# column #6
+.align 2
+card_list595505:
+.word 11  # list's size
+.word node82472 # address of list's head
+node82472:
+.word 6574903
+.word nodefuck
+nodefuck:
 .word 6574900
-.word node228499
-node452585:
-.word 6574900
-.word node484647
-node228499:
-.word 6574897
-.word node793360
-node793360:
+.word node868785
+node840121:
+.word 7689015
+.word node18421
+node210501:
+.word 7689009
+.word 0
+node18421:
+.word 7689014
+.word node353167
+node353167:
 .word 7689013
+.word node220144
+node868785:
+.word 7689017
+.word node866873
+node870144:
+.word 7689010
+.word node210501
+node866873:
+.word 7689016
+.word node840121
+node220144:
+.word 7689012
+.word node569666
+node569666:
+.word 7689011
+.word node870144
+# column #3
+.align 2
+card_list171864:
+.word 1  # list's size
+.word node632686 # address of list's head
+node632686:
+.word 7689010
+.word 0
+# column #5
+.align 2
+card_list493365:
+.word 6  # list's size
+.word node515666 # address of list's head
+node373743:
+.word 7689013
+.word node706753
+node521908:
+.word 7689010
+.word 0
+node618631:
+.word 7689014
+.word node373743
+node706753:
+.word 7689012
+.word node273844
+node515666:
+.word 7689015
+.word node618631
+node273844:
+.word 7689011
+.word node521908
+# column #1
+.align 2
+card_list812016:
+.word 2  # list's size
+.word node261157 # address of list's head
+node261157:
+.word 6574905
+.word node737193
+node737193:
+.word 7689016
 .word 0
 # column #8
 .align 2
-card_list546800:
-.word 4  # list's size
-.word node397105 # address of list's head
-node890201:
-.word 6574904
-.word node582876
-node582876:
-.word 7689017
-.word 0
-node397105:
-.word 6574899
-.word node557802
-node557802:
-.word 6574899
-.word node890201
-# column #1
-.align 2
-card_list466763:
-.word 5  # list's size
-.word node954329 # address of list's head
-node632886:
+card_list338789:
+.word 3  # list's size
+.word node647750 # address of list's head
+node647750:
 .word 6574896
-.word node26465
-node813296:
-.word 6574897
-.word node503395
-node26465:
-.word 7689013
-.word 0
-node503395:
-.word 6574904
-.word node632886
-node954329:
-.word 6574903
-.word node813296
-# column #2
-.align 2
-card_list888166:
-.word 5  # list's size
-.word node779593 # address of list's head
-node842987:
-.word 6574900
-.word node526942
-node153212:
-.word 6574898
-.word node842987
-node779593:
-.word 6574904
-.word node890887
-node890887:
-.word 6574900
-.word node153212
-node526942:
-.word 7689014
-.word 0
-# column #7
-.align 2
-card_list164350:
-.word 5  # list's size
-.word node558093 # address of list's head
-node691529:
-.word 6574898
-.word node434365
-node434365:
-.word 6574903
-.word node275605
-node275605:
+.word node96168
+node96168:
+.word 7689016
+.word node537141
+node537141:
 .word 7689015
 .word 0
-node558093:
-.word 6574903
-.word node997090
-node997090:
-.word 6574902
-.word node691529
 # column #4
 .align 2
-card_list748778:
-.word 5  # list's size
-.word node93312 # address of list's head
-node789981:
-.word 6574899
-.word node713935
-node337043:
+card_list73675:
+.word 1  # list's size
+.word node465042 # address of list's head
+node465042:
+.word 7689015
+.word 0
+# column #2
+.align 2
+card_list921683:
+.word 10  # list's size
+.word node69 # address of list's head
+node69:
+.word 6574903
+.word node868784
+node840120:
+.word 7689015
+.word node18420
+node210500:
+.word 7689009
+.word 0
+node18420:
+.word 7689014
+.word node353166
+node353166:
+.word 7689013
+.word node220143
+node868784:
+.word 7689017
+.word node866872
+node870143:
+.word 7689010
+.word node210500
+node866872:
+.word 7689016
+.word node840120
+node220143:
+.word 7689012
+.word node569665
+node569665:
+.word 7689011
+.word node870143
+# column #7
+.align 2
+card_list252786:
+.word 6  # list's size
+.word node282115 # address of list's head
+node294916:
+.word 7689011
+.word node800476
+node244027:
+.word 7689012
+.word node294916
+node800476:
+.word 7689010
+.word node718931
+node718931:
+.word 7689009
+.word node80978
+node80978:
 .word 7689008
 .word 0
-node713935:
-.word 6574904
-.word node55931
-node55931:
-.word 6574901
-.word node337043
-node93312:
-.word 6574897
-.word node789981
-# column #5
-.align 2
-card_list424833:
-.word 5  # list's size
-.word node65183 # address of list's head
-node259603:
-.word 6574897
-.word node22789
-node22789:
-.word 7689013
-.word 0
-node670722:
-.word 6574903
-.word node259603
-node697509:
-.word 6574903
-.word node670722
-node65183:
+node282115:
 .word 6574902
-.word node697509
+.word node244027
 ##### Move #####
-move: .word 459778
+move: .word 16777216
 
 
 .text
 .globl main
 main:
+li $s0, 699
+li $s1, 699
+li $s2, 699
+li $s3, 699
+li $s4, 699
+li $s5, 699
+li $s6, 699
+li $s7, 699
+
+# We print the board before
+la $a0, board
+jal print_board
+
+li $a0, '\n'
+li $v0, 11
+syscall
+
+# Print the deck before
+la $a0, deck
+jal print_card_in_card_list
+
 la $a0, board
 la $a1, deck
 lw $a2, move
 jal move_card
 
 # Write code to check the correctness of your code!
+move $t7, $v0
+
+li $a0, '\n'
+li $v0, 11
+syscall
+
+move $a0, $t7
+li $v0, 1
+syscall
+
+li $a0, '\n'
+li $v0, 11
+syscall
+
+# We print the board after
+la $a0, board
+jal print_board
+
+li $a0, '\n'
+li $v0, 11
+syscall
+
+# Print the deck after
+la $a0, deck
+jal print_card_in_card_list
+
 li $v0, 10
 syscall
 

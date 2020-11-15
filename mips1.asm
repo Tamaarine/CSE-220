@@ -1,5 +1,5 @@
 .data
-hi: .word 0x00645338
+hi: .word 7689017
 
 .text
 # We load positive 8 into our register $t1

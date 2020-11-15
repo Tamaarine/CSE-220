@@ -644,6 +644,16 @@ print_board:
         li $v0, 1
         syscall 
         
+        # We also want to print the size here as well
+        li $a0, '-'
+        li $v0, 11
+        syscall
+        
+        lbu $a0, 0($t1)
+        li $v0, 1
+        syscall
+        
+        # Print :
         li $a0, 58
         li $v0, 11
         syscall
@@ -1832,11 +1842,596 @@ deal_move:
     jr $ra
 
 move_card:
+    # This function will actually do the game move that is encoded in the move argument
+    # using the given gameboard and the deck of cards. If the move is valid then
+    # we actually do it. If not then we just return -1
+    
+    # $a0 -> The pointer that points to array of 9 pointers
+    # $a1 -> The pointer that points to a valid card_list that represent a deck of cards
+    # $a2 -> An integer that encodes a game move
+    # Output -> $v0, Returns -1 if check_movee say it is an illegal move in anyway
+    # or it return 1 if the given move is executed
+    
+    # Since we will be calling functions throughout this method we will have to save
+    # the arguments in the $s registesr
+    # 3 argument, 12 bytes plus 4 more byte for return address. 16 bytes for now
+    # 2 more $s registers, 8 more bytes
+    addi $sp, $sp, -24 # Allocating 24 bytes of memory on the run time stack
+    
+    # Saving the $s registers
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    # 8($sp) will be left empty for storing the move
+    sw $s2, 12($sp) # Saving the $s2 register
+    sw $s3, 16($sp) # Saving the $s3 register
+        
+    # We also have to save the return address else it won't know where to return to
+    sw $ra, 20($sp)
+    
+    # Then we can proceed to save the arguments in the $s registers
+    move $s0, $a0 # $s0 will be the pointer that points to the array of 9 pointers 
+    move $s1, $a1 # $s1 will be the pointer that points to the card_list that represent deck of cards
+    # Instead of saving the move in a $s register we will save it on the stack directly
+    # at 8($sp). So 8($sp) gives byte #0, 9($sp) gives byte #1 and so on
+    sw $a2, 8($sp)
+    
+    # First things first we have to call check_move to see if the given move is
+    # valid or not
+    # $a0 -> The board array we are using
+    # $a1 -> The deck of cards
+    # $a2 -> The game move
+    move $a0, $s0
+    move $a1, $s1
+    lw $a2, 8($sp) # We just have to load the word from the run time stack to get the move integer back
+    
+    # Now we can actually call the function check_move
+    jal check_move
+    
+    # In $v0 we have values from -1 to -8 inclusive that signal an illegal move
+    # and values from 1 to 3 inclusive that signals a legal move 
+    # So if $v0 is anything that is less than 0 then we will just return -1 since it is an illegal move
+    blt $v0, $0, move_card_illegal_move
+    
+    # Now if we are here then that means $v0 is either
+    # 1 a legal deal move
+    # 2 a normal move that moves cards from donor column to a empty recipient column
+    # 3 a normal move that moves cards from donor column to a non-empty recipient column
+    # We will break into different cases based on the return value
+    li $t7, 1 # Load 1 for comparsion
+    
+    # If the return value from check_move is 1 then we do deal_move
+    beq $v0, $t7, move_card_deal_move 
+    
+    li $t7, 2 # Load 2 for comparsion
+    
+    # If the return value from check_move is 2 then we do normal_move_empty_column
+    beq $v0, $t7, move_card_normal_move_to_empty_column
+    
+    # Now if we are here then it is only one option what the check_move returned
+    # which is 3 and that means normal move to nonempty column
+    j move_card_normal_move_to_nonempty_column
     
     
+    move_card_deal_move:
+    # If we are here then that means we are just simply doing a deal_move
+    # We will call deal_move first to deal out the cards
+    # $a0 -> The board that we are dealing the cards to
+    # $a1 -> The deck that we are deaaling the cards from
+    move $a0, $s0 # The boards that we are dealing the cards to
+    move $a1, $s1 # The deck of cards
+    
+    # Then we can call deal_move to actually deal out the cards
+    jal deal_move
+    
+    # Okay so after the previous function calls we have deal out the cards already
+    # now the next step is to call clear_full_straight on every single columns
+    # to try to cleare out any full straight that it has
+    # We will be doing that over a for loop
+    # And we will use $s2 to keep it as our counter starting at 0
+    # and $s3 as our stopping condition which is 9
+    li $s2, 0
+    li $s3, 9
+    
+    # Now we can begin our for loop to call clear_full_straight on all the columns
+    for_loop_to_clear_full_straight_on_all:
+        # Let's just get the stopping condition out of the way which is when 
+        # our counter is greater than or equal to 9, that means we have
+        # called clear_full_straight on all the 9 columns already
+        bge $s2, $s3, finished_loop_clear_full_straight_on_all
+    
+        # However if we are here then that means we haven't finished calling
+        # clear_full_straight on all of the columns yet so we have to do it here
+        # $a0 -> The board of columns we are looking at
+        # $a1 -> The specific column index we are clearing the straight from
+        move $a0, $s0 # The board of arrays we are going through
+        move $a1, $s2 # The specific column index we are clearing the straight
+        
+        # Then we can call clear_full_straight
+        jal clear_full_straight
+        
+        # And after the previous call we can move onto the next column to clear the straight
+        # We increment our counter
+        addi $s2, $s2, 1
+        
+        # And jump back up the loop for next iteration
+        j for_loop_to_clear_full_straight_on_all
+    
+    finished_loop_clear_full_straight_on_all:
+    # If we are here then that means we have finished calling clear_full_straight on
+    # all of the board columns and we can just return 1 since we sucuessfully
+    # executed a deal move
+    li $v0, 1
+    
+    # And we can jump ti finished algorithm
+    j finished_move_card_algorithm
     
     
+    move_card_normal_move_to_empty_column:
+    # If we are here then that means we are moving one or more or entire column
+    # of cards to the recipient column which is empty
+    # Now there are two cases to consider, case when the row is 0, meaning moving the
+    # entire column or it could just mean 1 card. The other case is when the row is not 0
+    # meaning moving 1 or more cards but not the entire column
     
+    # Let's get the donor column's address
+    lbu $t0, 8($sp)
+    
+    # Then calculate the effective address of where donor column is stored
+    li $t7, 4 # 4 for multiplication
+    
+    # i * 4 into $t1
+    mul $t1, $t0, $t7
+    
+    # Then we add the offset to the base_address and store it into $t0 again
+    add $t0, $s0, $t1
+    
+    # Now we have to actually load in the content of effective address into $s2
+    lw $s2, 0($t0)
+    
+    # Let's get the recipient column's address too
+    lbu $t0, 10($sp)
+    
+    # Then i * 4 again into $t1
+    mul $t1, $t0, $t7
+    
+    # And add it to the offset of the base_address and store it into $t0 again
+    add $t0, $s0, $t1
+    
+    # Then load the actual content of the effective address into $s3
+    lw $s3, 0($t0)
+    
+    
+    # Okay before we split into two cases again let's recap
+    # $s2 have the address of the donor column
+    # $s3 have the address of the recipient column
+
+    
+    # Let's get the row into $t0 and break it up into different cases
+    lbu $t0, 9($sp)
+    
+    # If the donor row we are taking from is actually 0 then that means
+    # we are moving the entire row or only one card, it doesn't matter
+    # we are moving the entire row
+    beq $t0, $0, normal_move_to_empty_column_entire_column
+    
+    # However, if we are here then we are not moving an entire column
+    # hence more work is needed
+    j normal_move_to_empty_column_not_entire_column
+    
+    
+    normal_move_to_empty_column_entire_column:
+    # If we are here then that means we are going to move the entire donor
+    # column to an empty recipient column
+    # We have to get the head address and the size of the donor column first
+    # We will put the head address into $t0
+    lw $t0, 4($s2)
+    
+    # And the size of the donor column into $t1
+    lw $t1, 0($s2)
+    
+    # Now since we are moving the entire column we have to clear out everything
+    # of the donor column so we just have to set size to 0, and head to 0
+    sw $0, 0($s2) # Size to 0
+    sw $0, 4($s2) # Head to 0 (null)
+    
+    # Then we store the head address we have into the recipient column
+    sw $t0, 4($s3) # Put head address as head address of the recipient column
+    sw $t1, 0($s3) # Update the size of the recipient column as well
+    
+    # Now we have to call clear_full_straight only on the recipient column
+    # $a0 -> The board to clear the full straight in
+    # $a1 -> The specific column that we want to clear the full straight in which is recipient column
+    move $a0, $s0 # The board array that we are clearing full straight in
+    lbu $a1, 10($sp) # The recipient column's index
+    
+    # Then we can just call the method
+    jal clear_full_straight
+    
+    # Then we load in 1 as our output value
+    li $v0, 1
+    
+    # And we can jump to finish
+    j finished_move_card_algorithm
+    
+    
+    normal_move_to_empty_column_not_entire_column:
+    # If we are here then that means we are going to move only part of the donor
+    # column to an empty recipient column
+    # We will have to get the important card's next address and the size we can calculate later
+    # We need a for loop to traverse up to that point which is row - 1
+    # Let's load the row in first into $t1
+    lbu $t1, 9($sp)
+    
+    # Then we subtract 1 from it which gives us the index of the important card
+    addi $t1, $t1, -1
+    
+    # We will have a counter which starts at 0
+    li $t0, 0
+    
+    # And we will also need a currNode pointer which starts at the head of the donor column
+    lw $t2, 4($s2)
+    
+    # This for loop will help us locate the address of that important card
+    # which we can use to cut off the cards we are moving
+    # and help us get the cards we are moving to recipient column
+    for_loop_to_find_the_important_card_part1:
+        # Get the stopping condition out of the way first
+        # which is whenever our counter is greater than or equal to $t1
+        bge $t0, $t1, finished_loop_to_find_important_card_part1
+    
+        # If we are still in this for loop then that means we haven't reach the important card yet
+        # let's just increment 
+        # Our currNode pointer will be the next, let's load in next into $t3
+        lw $t3, 4($t2)
+        
+        # Then we update our currNode to be next
+        move $t2, $t3
+        
+        # Then we also have to increment our counter
+        addi $t0, $t0, 1
+        
+        # And jump back up the for loop
+        j for_loop_to_find_the_important_card_part1
+    
+    finished_loop_to_find_important_card_part1:
+    # If we are outside of the previous for loop that means $t2 have the
+    # address of the important card
+    # We get the next of the important card into say $t3
+    lw $t3, 4($t2)
+    
+    # To calculate the new size we first have to do size - row of donor column
+    # Load in the size again into $t0
+    lbu $t0, 0($s2)
+    
+    # We also need the row again into $t1
+    lbu $t1, 9($sp)
+    
+    # Then we subtract the size - row and put the result into $t3
+    sub $t3, $t0, $t1
+    
+    # So $t3 is how many cards we are taking from donor column which will be the
+    # new size of the recipient column
+    # Now subtracting size with $t3 will gives us how many cards are left in the donor column
+    # let's put that into $t4
+    sub $t4, $t0, $t3
+    
+    # So $t3 is the new size for recipient column
+    # $t4 is the new size for donor column
+    # $t2 is the imporatnt card
+    # Let's load in the address of the next of the important card into $t0
+    lw $t0, 4($t2)
+    
+    # We set the recipient column's head to this address
+    sw $t0, 4($s3)
+    
+    # Then we have to update the recipient column's size which is just $t3
+    sw $t3, 0($s3)
+    
+    # Lastly we also have to update the important card's next to be 0
+    sw $0, 4($t2)
+    
+    # And update the donor column's size to be $t4
+    sw $t4, 0($s2)
+    
+    # We also have to flip the important 'over'
+    li $t7, 'u' # 'u' for storing a flipped over card
+    
+    # We store this byte at byte #2 of the important card to flip it over
+    sb $t7, 2($t2)
+    
+    # Now we have to call clear_full_straight only on the recipient column
+    # $a0 -> The board to clear the full straight in
+    # $a1 -> The specific column that we want to clear the full straight in which is recipient column
+    move $a0, $s0 # The board array that we are clearing full straight in
+    lbu $a1, 10($sp) # The recipient column's index
+    
+    # Then we can just call the method
+    jal clear_full_straight
+    
+    # Then we load in 1 as our output value
+    li $v0, 1
+    
+    # Anddd we are finished! We can just jump to finished algorithm
+    j finished_move_card_algorithm
+    
+    
+    move_card_normal_move_to_nonempty_column:
+    # If we are here then that means we are moving one or more or entire column
+    # of cards to the recipient column which is nonempty
+    
+    # Let's get the donor column's address
+    lbu $t0, 8($sp)
+    
+    # Then calculate the effective address of where donor column is stored
+    li $t7, 4 # 4 for multiplication
+    
+    # i * 4 into $t1
+    mul $t1, $t0, $t7
+    
+    # Then we add the offset to the base_address and store it into $t0 again
+    add $t0, $s0, $t1
+    
+    # Now we have to actually load in the content of effective address into $s2
+    lw $s2, 0($t0)
+    
+    # Let's get the recipient column's address too
+    lbu $t0, 10($sp)
+    
+    # Then i * 4 again into $t1
+    mul $t1, $t0, $t7
+    
+    # And add it to the offset of the base_address and store it into $t0 again
+    add $t0, $s0, $t1
+    
+    # Then load the actual content of the effective address into $s3
+    lw $s3, 0($t0)
+    
+    
+    # $s2 have the address of the donor column
+    # $s3 have the address of the recipient column
+    # Then we will split into two cases again where the row could be 0
+    # meaning we take the entire column. If it is not 0 then that means
+    # we are not taking the entire column, could be one card or more cards
+    # Let's load in the row index again into $t0
+    lbu $t0, 9($sp)
+    
+    # If the row is equal to 0 then we move the entire row
+    beq $t0, $0, normal_move_to_nonempty_column_entire_column
+    
+    # However if the row is not equal to 0 then we only move partial row
+    j normal_move_to_nonempty_column_not_entire_column
+    
+    
+    normal_move_to_nonempty_column_entire_column:
+    # If we are here then we are moving the entire donor column into
+    # a nonempty recipient column which shouldn't be that bad to handle i hope
+    # We have to get the head and size of the donor row
+    # Let's get the head address into $t0
+    lw $t0, 4($s2)
+    
+    # And the size into $t1
+    lw $t1, 0($s2)
+    
+    # Now we have to find the last card of the recipient column before we can append these the recipient column
+    # We will of course do that through a for loop
+    # We will let $t2 be our counter
+    li $t2, 0
+    
+    # We will let the size - 1 of the recipient column be our stopping condition
+    lw $t3, 0($s3)
+    addi $t3, $t3, -1
+    
+    # Then we keep a currNode pointer in $t4 which initially points at the head of the recipient column
+    lw $t4, 4($s3)
+    
+    # Now we can begin our for loops to find the last card in the recipient column
+    for_loop_to_find_tail_of_recipient_column_part1:
+        # Let's just get the stopping condition out of the way first
+        # which is when our counter is greater than or equal to the stopping condition
+        bge $t2, $t3, finished_loop_to_find_tail_of_recipient_column_part1
+        
+        # If we are here then we haven't yet reach the last card hence we have to increment
+        # our counters. We load the next address of the currNode pointer into $t5
+        lw $t5, 4($t4)
+        
+        # Then update our currNode pointer to that next node
+        move $t4, $t5
+        
+        # And increment our counter
+        addi $t2, $t2, 1
+        
+        # Jump back up the loop
+        j for_loop_to_find_tail_of_recipient_column_part1
+    
+    finished_loop_to_find_tail_of_recipient_column_part1:
+    # If we are here then we have found the address of the last CardNode in the recipient
+    # column in $t4. Then we can proceed to append the cards from the donor column
+    # All we have to do is change the last card's next to be $t0
+    sw $t0, 4($t4)
+    
+    # And we have to add the size of the donor column to the recipient's size
+    # Get the recipient column's size into $t5
+    lw $t5, 0($s3)
+    
+    # Add the donor column's size with the recipient column's size
+    add $t5, $t5, $t1
+    
+    # And just store it back in
+    sw $t5, 0($s3)
+    
+    # Don't forget to change the head of donor's column to 0 as well because we moved the entire row
+    sw $0, 4($s2)
+    
+    # And we also have to update the donor column's size to 0 as well since we move entire row
+    sw $0, 0($s2)
+    
+    # Now we have to call clear_full_straight only on the recipient column
+    # $a0 -> The board to clear the full straight in
+    # $a1 -> The specific column that we want to clear the full straight in which is recipient column
+    move $a0, $s0 # The board array that we are clearing full straight in
+    lbu $a1, 10($sp) # The recipient column's index
+    
+    # Then we can just call the method
+    jal clear_full_straight
+    
+    # Then we load in 1 as our output value
+    li $v0, 1
+    
+    # And be done with this function
+    j finished_move_card_algorithm
+    
+    
+    normal_move_to_nonempty_column_not_entire_column:
+    # If we are here then we are only moving one or more cards not the entire
+    # column of the donor column to a nonempty recipient column
+    # Again we will need a for loop to help us traverse through the linked list
+    # until we find that important CardNode which is located at row - 1 index
+    lbu $t1, 9($sp)
+    
+    # Then we subtract 1 to get us the index of the important card
+    addi $t1, $t1, -1
+    
+    # Then we will have a counter which starts at 0
+    li $t0, 0
+    
+    # We will also need a currNode pointer which starts at he head of the donor column in $t2
+    lw $t2, 4($s2)
+    
+    # Okay great we can begin our for loop to search for that important card
+    for_loop_to_find_the_important_card_part2:
+        # Let's just get our stopping condition out of the way
+        # which is when the counter is greater than or equal to the stopping condition
+        bge $t0, $t1, finished_loop_to_find_important_card_part2    
+    
+        # However if we are here then we haven't reach the important card's index and address yet
+        # hence we have to increment everything
+        # Load the next's address into $t3
+        lw $t3, 4($t2)
+        
+        # And update $t2
+        move $t2, $t3
+        
+        # Increment our counter
+        addi $t0, $t0, 1
+        
+        # Jump back up the loop
+        j for_loop_to_find_the_important_card_part2
+    
+    finished_loop_to_find_important_card_part2:
+    # If we are here $t2 have the address of the important card
+    # Now we also need to find the address of the last card in the recipient column
+    # Let $t0 be our counter
+    li $t0, 0
+    
+    # And $t1 be our stopping condition which is the recipient size - 1
+    lw $t1, 0($s3)
+    
+    # Subtract 1 to get the last card index
+    addi $t1, $t1, -1
+    
+    # Then we let $t3 be our currNode pointer
+    lw $t3, 4($s3)
+    
+    for_loop_to_find_tail_of_recipient_column_part2:
+        # Get the stopping condition out of the way first
+        # which is when counter is greater than or equal to the stopping conditrion
+        bge $t0, $t1, finished_loop_to_find_tail_of_recipient_column_part2
+    
+        # Here we haven't reach the recipient column's last card hence increment
+        # we put the next in $t4
+        lw $t4, 4($t3)
+        
+        # Then we update currNode pointer to be next
+        move $t3, $t4
+        
+        # Increment our counter
+        addi $t0, $t0, 1
+        
+        # Jump back up the loop
+        j for_loop_to_find_tail_of_recipient_column_part2
+    
+    finished_loop_to_find_tail_of_recipient_column_part2:
+    # If we are here then that means $t2 have the address of the important card in donor column
+    # and $t3 is the address of the last card in recipient column
+    # We get the next address of the important card in $t0
+    lw $t0, 4($t2)
+    
+    # Then we make recipient column's last card point to that as well
+    sw $t0, 4($t3)
+    
+    # Then we have to make important card next to point to 0
+    sw $0, 4($t2)
+    
+    # And we update the size on both columns
+    # Load in the current donor column size into $t0
+    lw $t0, 0($s2)
+    
+    # We subtract the donor column size - row
+    lbu $t1, 9($sp) # Load in the row
+    sub $t4, $t0, $t1 # The result in $t4 is how many cards we are taking
+    
+    # Then we subtract size with how many cards we are taking which
+    # will give us how many cards are left in $t5
+    sub $t5, $t0, $t4
+    
+    # So $t4 is what we have to add to the recipient column's size
+    # $t5 is the new size for the donor column
+    sw $t5, 0($s2) # update the size for donor column
+    
+    # Then we get the current size of the recipient column in $t0
+    lw $t0, 0($s3)
+    
+    # We add how many cards we took in $t4 with it
+    add $t0, $t0, $t4
+    
+    # And store that back into recipient column
+    sw $t0, 0($s3)
+    
+    # We also have to flip the important 'over'
+    li $t7, 'u' # 'u' for storing a flipped over card
+    
+    # We store this byte at byte #2 of the important card to flip it over
+    sb $t7, 2($t2)
+    
+    # Finally we have to call clear_full_straight on the recipient column
+    # $a0 -> The board we are clearing
+    # $a1 -> The specific column we are clearing the straight which is recipient column
+    move $a0, $s0
+    lbu $a1, 10($sp)
+    
+    # Call the method
+    jal clear_full_straight
+    
+    # We return 1 as we have sucessfully executed the algorithm
+    li $v0, 1
+    
+    # And jump to finish algorithm
+    j finished_move_card_algorithm
+    
+    
+    move_card_illegal_move:
+    # If we are here then that means the encoded move given is an illegal move
+    # we just have to return -1 
+    li $v0, -1
+    
+    # Just follow logically to finish this algorithm
+    
+    finished_move_card_algorithm:
+    # If we are here then that means we are done with this algorithm
+    # we can start restoring the $s registers and deallocate the memories we have used
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    lw $s2, 12($sp) # Restoring the $s2 register
+    lw $s3, 16($sp) # Restoring the $s3 register
+    # We didn't use register for 8($sp) so we don't have to restore a $s register for it
+    
+    # Then we also have to restore the return address else move_card won't know where to return to
+    lw $ra, 20($sp)
+    
+    # And finally deallocate the memories we have used
+    addi $sp, $sp, 24 # Deallocating the 24 bytes of memory we have used
+
+    # Jump back to the caller    
     jr $ra
 
 load_game:
