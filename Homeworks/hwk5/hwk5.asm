@@ -2435,9 +2435,789 @@ move_card:
     jr $ra
 
 load_game:
+    # The function opens the file and use the content to initialize the board
+    # deck and moves
+
+    # $a0 -> The filename that we are reading from
+    # $a1 -> The address that represents the array of 9 pointers that points to
+    # 9 different card_list structs in which all 9 card_list are all uninitalized  
+    # $a2 -> An uninitialized card_list struct that is suppose to store the deck of cards
+    # $a3 -> An address that represents an allocated memory that is large enough to store all the
+    # moves that is in the file
+    # Output -> $v0, -1 if the file is not found 1 if the file is open successfully
+    # Output -> $v1, -1 if the file is not found, else the number of moves in the moves array    
+    
+    # We have to save the arguemnts because we are calling functions
+    # 4 arguments 16 bytes, and 4 more byte for the return address so total of 20 bytes
+    # we need to also allocate 4 more bytes for the file reader to store the byte that is read from the file
+    # 3 more gister so 12 more bytes
+    addi $sp, $sp, -36 # Allocating 36 bytes of memory on the stack
+    
+    # Saving the $s registers before we can use them
+    sw $s0, 4($sp) # Saving the $s0 register
+    sw $s1, 8($sp) # Saving the $s1 register
+    sw $s2, 12($sp) # Saving the $s2 register
+    sw $s3, 16($sp) # Saving the $s3 register
+    sw $s4, 20($sp) # Saving the $s4 register
+    sw $s5, 24($sp) # Saving the $s5 register
+    sw $s6, 28($sp) # Saving the $s6 register
+
+    # Then we also have to save the return address else it won't know where to return to
+    sw $ra, 32($sp)    
+    
+    # We will leave 0($sp) for the file descriptor to put the read byte there
+    
+    # Now we can save our arguments
+    move $s0, $a0 # $s0 will have the file name
+    move $s1, $a1 # $s1 will have the address that represent the array of 9 pointers to 9 card_list struct
+    move $s2, $a2 # $s2 will be the uninitalized card_list struct that represent deck of cards
+    move $s3, $a3 # $s3 will be the address that points to a region memory that will be array of integers help store the encoded move integers 
+    
+    # Let's open our file first by calling syscall 13
+    # $a0 -> The file name we are opening
+    # $a1 -> is the flag should just be 0 for reading
+    # $a2 -> Mode is just ignored so just 0
+    move $a0, $s0
+    li $a1, 0
+    li $a2, 0
+    
+    # Then we load in the syscall into $v0 and do the syscall
+    li $v0, 13
+    syscall
+    
+    # Now in $v0 we have the file descriptor we should save this on the $s4 register
+    # so we won't lose it 
+    move $s4, $v0 # Saving the file descriptor
+    
+    # Then we will do a if-statement check if the file is opened sucessfully
+    # if the return file descriptor is a negative number then that means it is an error opening the file
+    blt $s4, $0, file_opening_error
+    
+    # However, if we are here then the file is opened sucessfully
+    # then we can start doing our parsing algorithm
+        
+        
+    parse_for_line_one_beginning:
+    # This is the first time we are entering parse_for_line_one
+    # hence we have to initialize the deck first before we start reading and appending the cards
+    # $a0 -> The card_list to initialize
+    move $a0, $s2
+    
+    # Then we call the init_list to initialize the card_list
+    jal init_list
+
+        
+    parse_for_line_one:
+    # If we are here then that means we are currently parsing the first line
+    # which parse for the starting deck of cards    
+    # We'll start with this one which is required to read two character at a time
+    
+    # We read only one character first, if it is a \n which has ascii value of 10
+    # then that means we go to parse_for_line_two, else we stay in parse_for_line_one
+    # and actually parse it
+    # $a0 -> The file descriptor
+    # $a1 -> The input buffer that we are storing the character to
+    # $a2 -> The number of charactersd we are reading which is just 1
+    move $a0, $s4 # The file descriptor
+    move $a1, $sp # We are reading the character to the run time stack
+    li $a2, 1 # Reading 1 character at a time    
+    
+    # Actually read it
+    li $v0, 14
+    syscall
+    
+    # Now in 0($sp) we have the byte that is read let's get it and put it into $t0
+    lbu $t0, 0($sp)
+    
+    # Load in '\n' for comparsion
+    li $t7, '\n'
+    
+    # If the character that we read is actually a new line then we go to the next line and
+    # parse the second line. We are done with parsing the first line
+    beq $t0, $t7, parse_for_line_two_beginning
+    
+    # However if we are here then that means we haven't yet finish parsing line one
+    # hence let's start parsing. So we already got 1 character which is the card's rank in $t0
+    # we have to call it again to read the second part of the card. I know it is not needed but it
+    # will help us increment the file descriptor
+    # $a0 -> The file descriptor
+    # $a1 -> The input buffer that we are storing the character to
+    # $a2 -> The number of charactersd we are reading which is just 1
+    move $a0, $s4 # The file descriptor
+    move $a1, $sp # We are reading the character to the run time stack
+    li $a2, 1 # Reading 1 character at a time    
+    
+    # Actually read it
+    li $v0, 14
+    syscall
+    
+    # We store the faceup or facedown into $t1
+    lbu $t1, 0($sp)
+    
+    # Let's review $t0 have the rank of the card and $t1 have the faceup or facedown attribute
+    # $t2 will be the suit of the card which is just 'S' for all of the card because we are playing
+    # one suit solitaire
+    # now we have to make the integer for it and append it to the deck
+    li $t2, 'S'
+    
+    # For the faceup or facedown attribute we shift 16 bit to the left
+    sll $t1, $t1, 16
+    
+    # For the suit of the card we shift 8 bit to the left
+    sll $t2, $t2, 8
+    
+    # We don't have to shift anything for the rank
+    # Now the integer of the card we are going to make will be stored into $t4 which starts with 0
+    li $t4, 0
+    
+    # Then we add the faceup and facedown to $t4
+    add $t4, $t4, $t1
+    
+    # Then we add the suit
+    add $t4, $t4, $t2
+    
+    # Then we add the rank of the card in ascii not in numbers
+    add $t4, $t4, $t0
+    
+    # Finally $t4 have the card_value that we are going to append to the deck
+    # and let's append it
+    # $a0 -> The card_list we are appending the card into
+    # $a1 -> The card integer value we are appending
+    move $a0, $s2
+    move $a1, $t4
+    
+    # Then we call the function to append it
+    jal append_card
+    
+    # After appending the card we have to jump back up the function as a loop
+    j parse_for_line_one
+        
+        
+    parse_for_line_two_beginning:
+    # Now if we are here then we just finished parsing the first line of the file
+    # now we begin parsing for the second line of the file
+    # Now there is nothing to do for the beginning of parsing line two
+    # except we have to make a counter for counting the number of moves we have stored
+    # which we can use $s0 for because we have open the file already
+    li $s0, 0 # Our counter for the number of moves we have parsed
+    
+    parse_for_line_two: 
+    # If we are here then that means we are currently parsing the second line
+    # which handles parsing the moves 
+    # Okay let's read in the first byte of the second line first
+    # $a0 -> The file descriptor
+    # $a1 -> The input buffer which is just $sp
+    # $a2 - > The number of bytes we are reading which is just 1 byte
+    move $a0, $s4
+    move $a1, $sp
+    li $a2, 1
+    
+    # Okay we call syscall 14
+    li $v0, 14
+    syscall
+    
+    # We get the first byte into $t0
+    lbu $t0, 0($sp)
+    
+    # We will do some if_statement checking
+    li $t7, '\n' # Load in '\n' for comparsion
+    
+    # If the byte that we read is a new line then that means we have finished
+    # parsing for line two and we need to move onto to parse for line three or more
+    beq $t0, $t7, parse_for_line_three_or_more_beginning
+    
+    # The other case we have to also check for is spaces
+    li $t7, ' ' # Load in ' ' for comparsion
+    
+    # If we load in a space we just have to ignore it and go to the next iteration
+    beq $t0, $t7, parse_for_line_two
+    
+    # And if it is not space and not new line then it has to be ascii values for the encoded moves
+    # Which means we are allowed to read the other 3 bytes now
+    # Keep in mind we have the digit read in $t0 which represent byte #0 of moves
+    
+    # We have to call syscall 14 three more times
+    move $a0, $s4
+    move $a1, $sp
+    li $a2, 1
+    
+    # Okay we call syscall 14
+    li $v0, 14
+    syscall
+    
+    # This is our byte #1 of moves
+    lbu $t1, 0($sp) 
+    
+    # Calling syscall 14 two more times
+    move $a0, $s4
+    move $a1, $sp
+    li $a2, 1
+    
+    # Okay we call syscall 14
+    li $v0, 14
+    syscall
+    
+    # This is our byte #2 of moves
+    lbu $t2, 0($sp)
+    
+    # Calling syscall 14 one more time
+    move $a0, $s4
+    move $a1, $sp
+    li $a2, 1
+    
+    # Okay we call syscall 14
+    li $v0, 14
+    syscall
+    
+    # This is our byte #3 of moves
+    lbu $t3, 0($sp)
+    
+    # $t0 -> byte #0
+    # $t1 -> byte #1
+    # $t2 -> byte #2
+    # $t3 -> byte #3
+    # We have to actually subtract each value by 48 first to get their numerical value from ascii value
+    addi $t0, $t0, -48
+    addi $t1, $t1, -48
+    addi $t2, $t2, -48
+    addi $t3, $t3, -48
+    
+    # Okay now we can actually begin making our move integer for us to append
+    # byte #3 need to be shifted 24 bit
+    # byte #2 need to be shifted 16 bit
+    # byte #1 need to be shifted 8 bit
+    # byte #0 don't need to be shiftted
+    sll $t3, $t3, 24
+    sll $t2, $t2, 16
+    sll $t1, $t1, 8
+    
+    # Okay then all we have to do is to add them all together all into $t4
+    li $t4, 0 # We initialize it to be 0
+    add $t4, $t3, $t2
+    add $t4, $t4, $t1
+    add $t4, $t4, $t0
+    
+    # Finally $t0 have the encoded integer which we have to store it as word
+    # onto the moves array
+    sw $t4, 0($s3)
+    
+    # After we store it we have to increment our counter
+    addi $s0, $s0, 1
+    
+    # We also have to increment the address we have to store the next move
+    addi $s3, $s3, 4
+    
+    # And finally we can jump back up the loop
+    j parse_for_line_two
+
+    
+    parse_for_line_three_or_more_beginning:
+    # If we are here then that means we are going to
+    # parse the third or more lines which handles the starting
+    # configuration of the boards
+    
+    # The first thing we have to do is to call init_list on each of the 9 entries
+    # of the board array. Initializing all of the 9 card_list structs before we can proceed
+    # We can put our counter in $s5 and our stopping condition into $s6
+    li $s5, 0
+    li $s6, 9
+    
+    # Then we can start our for loop to initialize all the 9 card_list 
+    for_loop_to_initialize_columns:
+        # Let's get the stopping condition out of the way first
+        # which is whenever our counter is greater than or equal to our stopping condition
+        # that means we have finished initializing all 9 columns of the board array
+        bge $s5, $s6, finished_loop_to_initialize_columns
+    
+        # If we are here then that means we haven't yet finished
+        # initiailzing all of the 9 columns in the board array
+        # So let's begin cleaning, we have to calculate the effective address
+        # of where the pointer that is stored in the board array
+        # the formula is base_address + i * 4
+        li $t7, 4 # Load 4 for multiplication
+        
+        # Then we multiply the index with 4 and store the product into $t0
+        mul $t0, $s5, $t7
+        
+        # Then we can add the base_address of board array with the offset to get effective address into $t1
+        add $t1, $s1, $t0
+        
+        # Okay so the content that is store at address $t1 is the pointer that we have to initialized
+        # we can just load the content into $a0 as our argument for init_list
+        # $a0 -> The card_list we are initializing
+        lw $a0, 0($t1)
+        
+        # And we can call the function init_list
+        jal init_list
+        
+        # And after we have finished initializing this list we have to increment our counter
+        addi $s5, $s5, 1
+        
+        # And jump back up the loop
+        j for_loop_to_initialize_columns
+    
+    finished_loop_to_initialize_columns:
+    # If we are here then all 9 card_list in board array is initialized and we can begin our parsing process
+    # which we can do just by following logically
+    
+    # But before we go we need a counter to keep track of which column we are adding the card to
+    # which we will use $s5 reigster for that
+    li $s5, 0
+    
+    
+    parse_for_line_three_or_more:
+    # If we are here then that means we are currently parsing the third or more lines
+    # which handles the starting configuration of the boards
+    # The step is very similar to the other two we will read only the first byte of the line
+    # first. If it is an ascii that represent a card, then we will read the other byte
+    # If it is a ' ' then we will read the other ' ' and go to the next iteration without any work
+    # If it is a '\n' then we will just skip to the next iteration to read next line
+    # If it receives a 0 in $v0 that means we reached the end of the file hence we are complete!
+    
+    # Say less and begin our reading
+    # $a0 -> The file descriptor
+    # $a1 -> The input buffer which is just $sp
+    # $a2 - > The number of bytes we are reading which is just 1 byte
+    move $a0, $s4
+    move $a1, $sp
+    li $a2, 1
+    
+    # Okay we call syscall 14
+    li $v0, 14
+    syscall
+    
+    # The first thing we should do is check the return value in $v0, if it is 0
+    # then that means the end of the file is reached hence we can stop reading
+    beq $v0, $0, finished_parsing_line_three_or_more
+
+    # However if we haven't reach the end of the file yet then we will keep parsing
+    # We will load the byte we just read into $t0
+    lbu $t0, 0($sp)
+
+    # We will check for ' ' spaces first
+    li $t7, ' ' # Load ' ' for comparsion
+    
+    # If the byte we read is a space then we just have to read
+    # the other space as well and jump back up the loop
+    beq $t0, $t7, line_three_or_more_found_space
+    
+    # However, if it is not a space then we will check if it is a '\n'
+    li $t7, '\n' # Load '\n' for comparsion
+    
+    # If we read the byte '\n' then we just have to skip to the next iteration
+    # to read from the next line. Don't need to increment column counter
+    beq $t0, $t7, parse_for_line_three_or_more
+    
+    # Now finally if we are here then we are reading a value for the cards
+    # then we have to also read the other byte as well
+    move $a0, $s4
+    move $a1, $sp
+    li $a2, 1
+    
+    # Okay we call syscall 14
+    li $v0, 14
+    syscall
+    
+    # We will put the other byte that read into $t1
+    lbu $t1, 0($sp)
+    
+    # So let's summarize what we have so far
+    # $t0 have the rank of the card in ascii
+    # $t1 have the faceup or facedown of the card in ascii
+    # We will put the suit which is all 'S' into $t2
+    li $t2, 'S'
+    
+    # Then here we need to do some shiftings
+    # $t0 the rank don't need any shifts
+    # $t1 which is the faceup or facedown need to be shifted 16 bits
+    # $t2 which is the suit need to be shifted 8 bits
+    sll $t1, $t1, 16
+    sll $t2, $t2, 8
+    
+    # We will store the card value into $t4 and it need to be initialized with 0
+    li $t4, 0
+    
+    # Then we can just add them all up
+    add $t4, $t4, $t1 # Add the faceup or facedown
+    add $t4, $t4, $t2 # Add the suit
+    add $t4, $t4, $t0 # Add the rank
+    
+    # Finally we have the card_value we are adding to the card_list in $t4
+    # and the column we are adding it to is in $s5
+    # We first have to divide $s5 by 9 first and get the remainder
+    li $t7, 9 # 9 for division
+    
+    # Do the division
+    div $s5, $t7 
+    
+    # Then we have the remainder in hi let's save it into $t0
+    mfhi $t0
+    
+    # Next we have to calculate the effective address of where that pointer
+    # is stored in the board array. base_address + i * 4
+    li $t7, 4 # Load 4 for mulitplication
+    
+    # We do i * 4 and store result into $t1
+    mul $t1, $t0, $t7
+    
+    # Then we add the offset to the base_address $s1 and store the result into $t2
+    # which is the effective address
+    add $t2, $s1, $t1
+    
+    # Okay great in the effective address $t2 is the pointer to the card_list struct
+    # where we putting the card to. We can call append_card now
+    # $a0 -> The card_list we are adding the card to
+    # $a1 -> The card value we are adding
+    lw $a0, 0($t2) # Getting the content which is the pointer store in the effective address
+    move $a1, $t4 # Put the card_value we are adding to $a1
+    
+    # Finally we can call append_card
+    jal append_card
+    
+    # After adding the card to the respective column we must increment our counter for the column
+    addi $s5, $s5, 1
+    
+    # And finally jump back up the for loop
+    j parse_for_line_three_or_more
+    
+    
+    line_three_or_more_found_space:
+    # If we are here then that means we have found space as the first byte
+    # then we will just read the second space and just go to the next iteration
+    # two spaces just means that there is no card for this column in this line
+    move $a0, $s4
+    move $a1, $sp
+    li $a2, 1
+    
+    # Okay we call syscall 14
+    li $v0, 14
+    syscall
+    
+    # We also need to increment our column counter because we skip over adding a card for this column
+    addi $s5, $s5, 1
+    
+    # We don't even care about storing it, we just want to increment our file descriptor
+    # so it will read the next column's card. So all we do here is just back up the loop
+    j parse_for_line_three_or_more
+
+
+    finished_parsing_line_three_or_more:
+    # If we are here then that means end of the file is reached
+    # we have finished parsing everything then all we have to do is to load $s0
+    # as our return value in $v1 and 1 as our return value in $v0
+    li $v0, 1
+    move $v1, $s0
+    
+    # Then we can just jump to finish algorithm
+    j finished_load_game_algorithm
+
+
+    file_opening_error:
+    # If we cannot open the file or the file doesn't exist then we will just
+    # return (-1,-1) as our output value
+    li $v0, -1
+    li $v1, -1
+    
+    # Then we can just follow logically to finish the algorithm
+
+    finished_load_game_algorithm:
+    # If we are here then we have to start restoring the $s registers
+    # and deallocate the memories we have used    
+    lw $s0, 4($sp) # Restoring the $s0 register
+    lw $s1, 8($sp) # Restoring the $s1 register
+    lw $s2, 12($sp) # Restoring the $s2 register
+    lw $s3, 16($sp) # Restoring the $s3 register
+    lw $s4, 20($sp) # Restoring the $s4 register
+    lw $s5, 24($sp) # Restoring the $s5 register
+    lw $s6, 28($sp) # Restoring the $s6 register
+    
+    # We also need to restore the return address else load_game won't know where to return to
+    lw $ra, 32($sp)
+    
+    # We don't have to restore 0($sp) to anything because that is just the buffer for the file descriptor
+    # Then we can deallocate the memories we have used
+    addi $sp, $sp, 36 # Deallocating the 36 bytes of memories we have used
+    
+    # And finally we can just return to the caller    
+    jr $ra
+
+print_move_list:
+    # This function will print the give move list as hexadecimal
+    
+    # $a0 -> The address of where the move array is located
+    # $a1 -> The size of the move integer array
+    
+    move $t1, $a0 # We will save the address pointer into $t1
+    li $t0, 0 # This is our counter
+    
+    # We can begin our for loop to print each move that is listed in the integer array
+    for_loop_to_print_each_move:
+        # Let's get the stopping condition out of the way first which is
+        # whenever our counter is greater than or equal to the size of the integer array
+        bge $t0, $a1, finished_loop_to_print_each_move
+    
+        # If we are here then that means we haven't finished printing all of the moves
+        # in the integer array let's load it and print it
+        lw $a0, 0($t1)
+        
+        # Then we print it 
+        li $v0, 34
+        syscall
+        
+        # Print a spce
+        li $a0, ' '
+        li $v0, 11
+        syscall
+        
+        # Then we have to increment our counters
+        addi $t0, $t0, 1
+        
+        # And we have to increment our address
+        addi $t1, $t1, 4
+        
+        # And jump back up the loop
+        j for_loop_to_print_each_move
+    
+    finished_loop_to_print_each_move:
+    # If we are here then that means we have finished printing each move we
+    # can just return to the caller
     jr $ra
 
 simulate_game:
+    # This function ties everything together and simulate the game
+    # based on the input in the given file
+    
+    # $a0 -> The file name to be open
+    # $a1 -> The pointer to a array of 9 pointers to 9 card_list structs
+    # $a2 -> This is the pointer that points to a uninitailized memory that represent deck of cards
+    # $a3 -> The region of memory big enough to store all the moves in the file
+    # Output -> $v0, -1 if the file can't be opened, else the number of valid moves were executed
+    # Output -> $v1, -1 if the file can't be opened, -2 if all the moves are executed but the
+    # game is not won, return 1 if the game is won which is the gameboard is cleared, and deck is empty
+
+    # Because we will be calling functions we have to save all these arguments
+    # 4 arguemnts, 16 bytes then with 4 more byte for the return address hence 20 byte in total
+    # 2 more register 8 more bytes
+    addi $sp, $sp, -28 # Allocating 28 bytes of memory on the run time stack
+    
+    # Then we have to save the $s reigsters before we can use them
+    sw $s0, 0($sp) # Saving the $s0 register
+    sw $s1, 4($sp) # Saving the $s1 register
+    sw $s2, 8($sp) # Saving the $s2 register
+    sw $s3, 12($sp) # Saving the $s3 register
+    sw $s4, 16($sp) # Saving the $s4 register
+    sw $s5, 20($sp) # Saving the $s5 register
+    
+    # Then we have to also save the return address else simulate_game won't know where to return to
+    sw $ra, 24($sp)
+    
+    # Finally we can save the arguments into the $s registers
+    move $s0, $a0 # $s0 have the filename that is needed to be open
+    move $s1, $a1 # $s1 have the pointer that points to an array of 9 pointers to 9 card_list structs
+    move $s2, $a2 # $s2 is the pointer that points to an uninitialized memory that represent deck of cards
+    move $s3, $a3 # $s3 is the region of memory used to store the array of moves
+
+    # The first step is to laod the game that is stored in the given file by calling load_game
+    # $a0 -> The filename to load the game from
+    # $a1 -> The array pointers that represent the 9 columns unintialized
+    # $a2 -> The pointer that points to a card_list which represent a deck of cards uninitialized
+    # $a3 -> A region of memory big enough to store all of the moves
+    move $a0, $s0
+    move $a1, $s1
+    move $a2, $s2
+    move $a3, $s3
+        
+    # We call the method load_game
+    jal load_game
+    
+    # Okay now in $v0 we have whether or not the file is successfully open and read or not which returns -1
+    li $t7, -1 # Load -1 for comparsion
+    
+    # If in $v0 it is -1 that means load_game failed which means we couldn't open the file at all
+    # hence we just return (-1,-1) as our output value
+    beq $v0, $t7, fail_to_load_game
+    
+    # But if we are here then that means the board, deck, and move and everything is
+    # initialized now we can begin executing the moves in the move array
+    # We need a counter to keep track of the number of valid moves we have executed
+    # we can repurpose $s0 because we have loaded the files already
+    li $s0, 0 # Counter for the number of valid moves executed
+    
+    # We will use $s4 as our index counter for the current move we are executing
+    # in the moves array
+    li $s4, 0
+    
+    # We will use $s5 as our stopping condition because that is the size
+    # of the moves array which is stored in $v1 after calling load_game
+    move $s5, $v1
+
+    # Then let's begin our for loops    
+    for_loop_to_execute_moves:
+        # Let's just get the stopping condition out of the way which is
+        # whenever our counter is greater than equal to our stopping condition
+        bge $s4, $s5, finished_loop_to_execute_moves
+        
+        # If we are here then we haven't finished executing all the moves
+        # yet hence we have to execute the move that is located in this current index
+        # We have to load in the moves we are currently executing first from the array
+        # The formula to calculate it is base_address + i * 4 since integer is 4 bytes
+        li $t7, 4 # Load 4 for multiplication
+        
+        # The index we multiply is $s4 let's store the offset into $t0
+        mul $t0, $s4, $t7
+        
+        # Then we add the offset to the base_address which is $s3
+        # and store it into $t1
+        add $t1, $s3, $t0
+        
+        # Okay we have the effective address of the move we need to execute
+        # we just have to load it for move_card
+        # $a0 -> The board we are playing on which is just $s1
+        # $a1 -> The deck of cards we are playing with which is just $s2
+        # $a2 -> The move we are executing which is in the address $t1
+        move $a0, $s1
+        move $a1, $s2
+        lw $a2, 0($t1)
+        
+        # Then we call move_card
+        jal move_card
+        
+        # Then it will return -1 if the move is illegal and nothing is done
+        # or it will return 1 if the move is legal and it has done something to the game
+        # We will only increment our legal move counter $s0 if it is a legal move
+        li $t7, 1 # Load 1 for comparsion
+        
+        # If the return value in $v0 after calling move_card is 1
+        # then that means we just executed a legal move hence we increment our counter
+        beq $v0, $t7, increment_legal_move_counter
+        
+        # However if we are here then that means the move is not valid
+        # hence we just jump to next_execute_move_iteration to handle incrementing of counters
+        j next_execute_move_iteration
+        
+        increment_legal_move_counter:
+        # If we are here then we have to increment our move counter
+        addi $s0, $s0, 1
+        
+        # Then we just have to follow logically to increment the counters        
+        next_execute_move_iteration:
+        # If we are here then we have to handle our counter to
+        # move onto the next move to execute by incrementing our counters
+        addi $s4, $s4, 1
+        
+        # Then we jump back up the loop
+        j for_loop_to_execute_moves
+    
+    finished_loop_to_execute_moves:
+    # If we are here then that means we have finished executing all the moves
+    # in $s0 we have the number of valid moves that is executed
+    # Now we have to check whether or not the game has won
+    # The easier condition to check first is if the deck is empty first
+    # Let's load size of the deck into $t0 first
+    lw $t0, 0($s2)
+    
+    # Now we check if it is not empty, if it is not empty then
+    # the game definitely did not win and we can just return -2 as our $v1 output
+    bne $t0, $0, simulate_game_did_not_win
+    
+    # Now if we didn't take the branch that means the deck is empty
+    # next we have to check if all of the columns in the board
+    # are also empty, if any of them is not empty then we
+    # just return -2
+    
+    # We will make our counter in $t0
+    li $t0, 0
+    
+    # Our stopping condition which is 9 in $t1
+    li $t1, 9
+    
+    # Then we can begin our for loop to search for non-empty columns
+    for_loop_to_find_nonempty_columns:
+        # Stopping conditions first which is whenever
+        # the counter is greater than or equal to 9
+        bge $t0, $t1, finished_loop_to_find_nonempty_columns
+    
+        # If we are here then we haven't finishing looking at all of the columns yet
+        # Let's load in the effective address of the column we are looking at
+        # base_address + i * 4
+        li $t7, 4 # Load in 4 for mulitplication
+        
+        # Then we multiply our index with 4 and store into $t2
+        mul $t2, $t0, $t7
+        
+        # Then we add the effective address with the offset into $t3
+        add $t3, $s1, $t2
+        
+        # Finally we load in the address that is stored at the effective address into $t4
+        lw $t4, 0($t3)
+        
+        # And we load the size from the card_list struct into $t5
+        lw $t5, 0($t4)
+        
+        # We check if the size is not 0 then we return -2 because 
+        # there is at least one nonempty column in the board
+        bne $t5, $0, simulate_game_did_not_win
+        
+        # If the column is indeed empty then we have to still
+        # check the other columns
+        # We increment the counter
+        addi $t0, $t0, 1
+        
+        # Then jump back up the loop
+        j for_loop_to_find_nonempty_columns
+        
+    finished_loop_to_find_nonempty_columns:
+    # If we made it out of the for loop that means
+    # all of the columns are empty hence we can tell the user that they have won the game!
+    j simulate_game_win
+
+    
+    simulate_game_did_not_win:
+    # If we are here then that means we have finished execuiting all of
+    # the moves that is inside moves array but the player didn't win
+    # hence we just return -2 in $v1 
+    move $v0, $s0 # The number of moves executed
+    li $v1, -2 # We load -2 because we didn't win the game
+    
+    # And we are done we can just finished_simulate_game
+    j finished_simulate_game
+    
+    simulate_game_win:
+    # If we are here then that means we have finished executing all of the moves that
+    # is inside the moves array and the player win with game board empty and
+    # the deck is also empty! Hence they won we just return 1
+    move $v0, $s0
+    li $v1, 1
+    
+    # And jump to finish simulating_game
+    j finished_simulate_game
+    
+    
+    fail_to_load_game:
+    # If we are here then that means we couldn't open the file at all hence
+    # we cannot simulate the game we just have to return (-1,-1) as our output value
+    li $v0, -1
+    li $v1, -1
+    
+    
+    # Then we can just follow logically to finish algorithm
+    finished_simulate_game:
+    # If we are here then that means we have finished simulating the game algorithm
+    # we can start restoring the $s registers we have used
+    lw $s0, 0($sp) # Restoring the $s0 register
+    lw $s1, 4($sp) # Restoring the $s1 register
+    lw $s2, 8($sp) # Restoring the $s2 register
+    lw $s3, 12($sp) # Restoring the $s3 register
+    lw $s4, 16($sp) # Restoring the $s4 register
+    lw $s5, 20($sp) # Restoring the $s5 reigster
+    
+    # We also have to restore the return address
+    lw $ra, 24($sp)
+    
+    # Then we have to deallocate the memories we have used
+    addi $sp, $sp, 28 # Deallocating the 28 bytes of memories we have used
+    
+    # And finally we can return to the caller    
     jr $ra
 
 ############################ DO NOT CREATE A .data SECTION ############################
