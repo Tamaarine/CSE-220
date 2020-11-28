@@ -502,15 +502,6 @@ deal_starting_cards:
     # If we are here then we have finished adding the 9 faceup cards
     # And we are essentially done with the algorithm, deal_starting_cards
     # don't return anything hence we can just start restoring and deallocating the memories
-    
-    # Let's also print the size of the deck as well to check how many cards
-    # we have left
-    lw $a0, 0($s1)
-    li $v0, 1
-    syscall
-    
-    move $a0, $s1
-    jal print_card_in_card_list
 
     # If we are here then we are done with the algorithm and we can start restoring the
     # $s registers we have used
@@ -2903,7 +2894,16 @@ load_game:
 
     finished_parsing_line_three_or_more:
     # If we are here then that means end of the file is reached
-    # we have finished parsing everything then all we have to do is to load $s0
+    # Let's close the file descriptor first before we do our return value
+    move $a0, $s4 # The file descriptor to close
+    
+    # syscall 16 to close the file descriptor
+    li $v0, 16
+    
+    # Closing the file descriptor
+    syscall
+    
+    # Then we have finished parsing everything then all we have to do is to load $s0
     # as our return value in $v1 and 1 as our return value in $v0
     li $v0, 1
     move $v1, $s0

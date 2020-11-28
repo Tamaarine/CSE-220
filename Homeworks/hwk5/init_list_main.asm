@@ -1,5 +1,5 @@
 .data
-card_list: .word 16832383 14472030  # garbage
+card_list: .word 123123121 14472030  # garbage
 
 .text
 .globl main

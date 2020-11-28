@@ -1,6 +1,6 @@
 # Simulate game04.txt - results in a loss
 .data
-filename: .asciiz "game04.txt"
+filename: .asciiz "game05.txt"
 ### Deck ###
 # Garbage values
 deck: .word 19159058 60556872
@@ -60,9 +60,20 @@ moves: .ascii "f3rXNtgppaRqx6x4hpG6taZeSVTrfXQSHPYHzpx2v6D3NnJBFceYXd1gg5EzmH1SH
 
 
 
+
 .text
 .globl main
 main:
+li $s0, 699
+li $s1, 699
+li $s2, 699
+li $s3, 699
+li $s4, 699
+li $s5, 699
+li $s6, 699
+li $s7, 699
+
+
 la $a0, filename
 la $a1, board
 la $a2, deck
@@ -95,27 +106,10 @@ li $a0, '\n'
 li $v0, 11
 syscall
 
-
-# Let's print the board first
-la $a0, board
-jal print_board
-
-li $a0, '\n'
-li $v0, 11
-syscall
-
-# Then we print the moves array
 la $a0, moves
-li $a1, 45
+li $a1, 1
 jal print_move_list
 
-li $a0, '\n'
-li $v0, 11
-syscall
-
-# Then we also print the deck
-la $a0, deck
-jal print_card_in_card_list
 
 
 # RESTORE THE REGISTERS WE USED

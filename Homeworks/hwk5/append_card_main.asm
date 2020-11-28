@@ -1,6 +1,6 @@
 # Append an item to a short list
 .data
-card_num: .word 6570802
+card_num: .word 6570809
 .align 2
 card_list:
 .word 5  # list's size
@@ -21,7 +21,6 @@ node253109:
 .word 7685168
 .word node411020
 
-
 .text
 .globl main
 main:
@@ -33,6 +32,9 @@ li $s4, 699
 li $s5, 699
 li $s6, 699
 li $s7, 699
+
+la $a0, card_list
+jal print_card_in_card_list
 
 la $a0, card_list
 lw $a1, card_num
